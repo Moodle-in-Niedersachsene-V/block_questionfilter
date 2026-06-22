@@ -1,0 +1,136 @@
+{{!
+    @template block_questionfilter/block
+    Fragebank-Filter-Block
+}}
+<div class="qf-block" data-blockid="{{blockid}}" id="qf-block-{{blockid}}">
+
+  {{! === Freitext-Suche === }}
+  <div class="mb-2">
+    <div class="input-group input-group-sm">
+      <span class="input-group-text"><i class="fa fa-search"></i></span>
+      <input type="text" class="form-control" id="qf-search-{{blockid}}"
+             placeholder="Suche … oder #tag + Enter" autocomplete="off">
+    </div>
+    <div id="qf-search-hint-{{blockid}}" class="text-muted mt-1" style="font-size:11px;display:none"></div>
+    <div id="qf-tag-chips-{{blockid}}" class="mt-1"></div>
+  </div>
+
+  {{! === Fragesammlungen — Multiselect-Dropdown === }}
+  <div class="mb-2">
+    <small class="text-muted fw-semibold text-uppercase d-block mb-1"
+           id="qf-cat-label-{{blockid}}">Fragesammlungen</small>
+
+    {{! Eingabefeld öffnet das Dropdown }}
+    <div class="qf-catdrop-wrap" id="qf-catdrop-wrap-{{blockid}}" style="position:relative">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text" style="padding:2px 7px">
+          <i class="fa fa-database" style="font-size:11px"></i>
+        </span>
+        <input type="text" class="form-control" id="qf-cat-filter-{{blockid}}"
+               placeholder="Sammlungen werden geladen …"
+               autocomplete="off" style="font-size:12px" readonly>
+        <button class="btn btn-outline-secondary btn-sm" id="qf-cat-clear-{{blockid}}"
+                title="Auswahl aufheben" style="display:none;padding:0 7px">
+          <i class="fa fa-times" style="font-size:11px"></i>
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" id="qf-cat-toggle-{{blockid}}"
+                style="padding:0 8px">
+          <i class="fa fa-chevron-down" style="font-size:11px"></i>
+        </button>
+      </div>
+
+      {{! Dropdown-Panel }}
+      <div id="qf-cat-panel-{{blockid}}" style="
+        display:none;position:absolute;z-index:1050;left:0;right:0;top:100%;
+        background:var(--bs-body-bg,#fff);border:1px solid #dee2e6;
+        border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.12);max-height:260px;
+        overflow:hidden;display:none;flex-direction:column">
+
+        {{! Suchfeld innerhalb des Panels }}
+        <div style="padding:6px 8px;border-bottom:1px solid #dee2e6;flex-shrink:0">
+          <input type="text" class="form-control form-control-sm"
+                 id="qf-cat-search-{{blockid}}"
+                 placeholder="Sammlung suchen …">
+        </div>
+
+        {{! Scrollbare Trefferliste }}
+        <div id="qf-cat-list-{{blockid}}"
+             style="overflow-y:auto;flex:1;padding:4px 0">
+          <div class="text-muted small px-3 py-2">Wird geladen …</div>
+        </div>
+
+        {{! Footer: Alle / Keine }}
+        <div style="padding:5px 8px;border-top:1px solid #dee2e6;flex-shrink:0;
+                    display:flex;gap:8px">
+          <button class="btn btn-link btn-sm p-0 text-muted qf-cat-sel-all"
+                  style="font-size:11px">Alle wählen</button>
+          <button class="btn btn-link btn-sm p-0 text-muted qf-cat-sel-none"
+                  style="font-size:11px">Keine</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {{! === Fragetyp === }}
+  <div class="mb-2">
+    <small class="text-muted fw-semibold text-uppercase d-block mb-1">Fragetyp</small>
+    <div id="qf-type-chips-{{blockid}}"></div>
+  </div>
+
+  {{! === Niveaustufen === }}
+  <div class="mb-2">
+    <small class="text-muted fw-semibold text-uppercase d-block mb-1">Niveaustufen</small>
+    <div id="qf-diff-chips-{{blockid}}">
+      {{#difficulties}}
+      <button class="badge qf-chip qf-chip-diff" data-value="{{.}}">{{.}}</button>
+      {{/difficulties}}
+    </div>
+  </div>
+
+  <hr class="my-2">
+
+  {{! === Ergebnis-Header === }}
+  <div class="d-flex justify-content-between align-items-center mb-1">
+    <small class="text-muted" id="qf-count-{{blockid}}">–</small>
+    <button class="btn btn-link btn-sm p-0 text-muted qf-select-all" style="font-size:12px">
+      Alle wählen
+    </button>
+  </div>
+
+  {{! === Ergebnisliste === }}
+  <div class="qf-results" id="qf-results-{{blockid}}">
+    <div class="text-center text-muted small py-3">Filter setzen, um Fragen zu suchen.</div>
+  </div>
+
+  <hr class="my-2">
+
+  {{! === Export-Leiste === }}
+  <div class="d-flex gap-1 flex-wrap align-items-center">
+    {{#export_xml}}
+    <button class="btn btn-sm btn-outline-secondary qf-export" data-format="xml" disabled>
+      <i class="fa fa-file-code-o"></i> XML
+    </button>
+    {{/export_xml}}
+    {{#export_csv}}
+    <button class="btn btn-sm btn-outline-secondary qf-export" data-format="csv" disabled>
+      <i class="fa fa-table"></i> CSV
+    </button>
+    {{/export_csv}}
+    {{#export_gift}}
+    <button class="btn btn-sm btn-outline-secondary qf-export" data-format="gift" disabled>
+      <i class="fa fa-file-text-o"></i> GIFT
+    </button>
+    {{/export_gift}}
+    <button class="btn btn-sm btn-primary qf-add-to-quiz ms-auto" disabled>
+      <i class="fa fa-plus"></i> Zum Test
+    </button>
+  </div>
+  <div class="mt-1">
+    <small class="text-muted" id="qf-sel-info-{{blockid}}">Nichts ausgewählt</small>
+  </div>
+
+  <div class="qf-spinner text-center py-2 d-none" id="qf-spinner-{{blockid}}">
+    <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+  </div>
+
+</div>
