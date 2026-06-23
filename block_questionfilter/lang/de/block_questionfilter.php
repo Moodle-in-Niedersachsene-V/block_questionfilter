@@ -58,3 +58,10 @@ $string['settings_resultlimit_help']        = 'Maximale Anzahl Fragen, die pro S
 $string['block_questionfilter:view']   = 'Fragebank-Filter-Block verwenden';
 $string['block_questionfilter:export'] = 'Fragen exportieren';
 $string['exportfailed'] = 'Export fehlgeschlagen. Bitte Moodle-Logs prüfen.';
+
+// Fragetypen-Quelle
+$string['settings_questiontypes_heading']      = 'Fragetypen';
+$string['settings_questiontypes_source']       = 'Angezeigte Fragetypen';
+$string['settings_questiontypes_source_help']  = 'Alle installierten: zeigt alle qtype-Plugins. Nur vorhandene: zeigt nur Typen die tatsächlich Fragen in der Bank haben.';
+$string['qtypes_installed'] = 'Alle installierten Fragetypen';
+$string['qtypes_existing']  = 'Nur Typen mit vorhandenen Fragen';

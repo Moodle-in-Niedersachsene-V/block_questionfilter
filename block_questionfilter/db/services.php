@@ -3,6 +3,16 @@ defined('MOODLE_INTERNAL') || die();
 
 $functions = [
 
+    'block_questionfilter_get_questiontypes' => [
+        'classname'      => 'block_questionfilter_external',
+        'methodname'     => 'get_questiontypes',
+        'description'    => 'Lädt alle in der Fragebank vorhandenen Fragetypen',
+        'type'           => 'read',
+        'ajax'           => true,
+        'loginrequired'  => false,
+        'capabilities'   => 'block/questionfilter:view',
+    ],
+
     'block_questionfilter_search_questions' => [
         'classname'      => 'block_questionfilter_external',
         'methodname'     => 'search_questions',

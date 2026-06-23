@@ -251,8 +251,90 @@ class block_questionfilter_external extends external_api {
     }
 
     // ---------------------------------------------------------------
-    // export_questions
+    // get_questiontypes — nur tatsächlich vorhandene Typen laden
     // ---------------------------------------------------------------
+    public static function get_questiontypes_parameters(): external_function_parameters {
+        return new external_function_parameters([
+            'scope'     => new external_value(PARAM_ALPHA, 'all|course|system', VALUE_DEFAULT, 'all'),
+            'contextid' => new external_value(PARAM_INT,   'Aktueller Kontext',  VALUE_DEFAULT, 1),
+            'source'    => new external_value(PARAM_ALPHA, 'existing|installed', VALUE_DEFAULT, 'installed'),
+        ]);
+    }
+
+    public static function get_questiontypes(string $scope, int $contextid, string $source = 'installed'): array {
+        global $DB, $CFG;
+
+        $params  = self::validate_parameters(self::get_questiontypes_parameters(),
+            ['scope' => $scope, 'contextid' => $contextid, 'source' => $source]);
+        $context = context::instance_by_id($params['contextid']);
+        self::validate_context($context);
+
+        if (!has_capability('block/questionfilter:view', context_system::instance())) {
+            throw new moodle_exception('nopermission', 'block_questionfilter');
+        }
+
+        $qtypes = [];
+
+        if ($params['source'] === 'installed') {
+            // Alle installierten qtype-Plugins laden
+            $plugintypes = core_component::get_plugin_list('qtype');
+            foreach ($plugintypes as $key => $path) {
+                // Systemtypen überspringen
+                if (in_array($key, ['missingtype', 'unknowntype'])) continue;
+                $plugin = 'qtype_' . $key;
+                if (get_string_manager()->string_exists('pluginname', $plugin)) {
+                    $label = get_string('pluginname', $plugin);
+                } else {
+                    $label = ucfirst($key);
+                }
+                $qtypes[$key] = $label;
+            }
+        } else {
+            // Nur Typen die tatsächlich in der Fragebank vorhanden sind
+            $contextids = self::get_searchable_contextids($params['scope'], $params['contextid']);
+            if (empty($contextids)) return ['qtypes' => []];
+
+            list($ctxsql, $ctxargs) = $DB->get_in_or_equal($contextids, SQL_PARAMS_NAMED, 'ctx');
+            $rows = $DB->get_records_sql(
+                "SELECT DISTINCT q.qtype
+                   FROM {question} q
+                   JOIN {question_versions} qv       ON qv.questionid        = q.id
+                   JOIN {question_bank_entries} qbe   ON qbe.id              = qv.questionbankentryid
+                   JOIN {question_categories} qc      ON qc.id               = qbe.questioncategoryid
+                  WHERE qc.contextid $ctxsql
+                    AND q.parent = 0
+                    AND qv.status = 'ready'
+               ORDER BY q.qtype",
+                $ctxargs
+            );
+            foreach ($rows as $r) {
+                $plugin = 'qtype_' . $r->qtype;
+                $label  = get_string_manager()->string_exists('pluginname', $plugin)
+                    ? get_string('pluginname', $plugin) : ucfirst($r->qtype);
+                $qtypes[$r->qtype] = $label;
+            }
+        }
+
+        // Alphabetisch nach Anzeigename sortieren
+        asort($qtypes);
+
+        $result = [];
+        foreach ($qtypes as $key => $label) {
+            $result[] = ['key' => $key, 'label' => $label];
+        }
+        return ['qtypes' => $result];
+    }
+
+    public static function get_questiontypes_returns(): external_single_structure {
+        return new external_single_structure([
+            'qtypes' => new external_multiple_structure(
+                new external_single_structure([
+                    'key'   => new external_value(PARAM_ALPHANUMEXT),
+                    'label' => new external_value(PARAM_TEXT),
+                ])
+            ),
+        ]);
+    }
     public static function export_questions_parameters(): external_function_parameters {
         return new external_function_parameters([
             'questionids' => new external_value(PARAM_TEXT, 'Kommagetrennte Fragen-IDs'),

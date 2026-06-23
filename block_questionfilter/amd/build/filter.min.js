@@ -2,12 +2,16 @@
 define(['core/ajax'], function(Ajax) {
     'use strict';
 
-    var QTYPES = {
+    // Fragetypen werden dynamisch geladen — diese Map dient nur als
+    // Anzeigenamen-Fallback falls get_questiontypes keinen Treffer liefert
+    var QTYPE_FALLBACK = {
         multichoice:'Multiple Choice', truefalse:'Wahr/Falsch',
         shortanswer:'Kurzantwort',     numerical:'Numerisch',
         essay:'Freitext',              match:'Zuordnung',
         ddwtos:'Drag & Drop',          gapselect:'Lückentext',
         calculated:'Berechnet',        description:'Beschreibung',
+        stack:'STACK',                 kprime:'KPrime',
+        mtf:'MTF',                     recordrtc:'Audioaufnahme',
     };
     var TYPE_COLOR = {
         multichoice:'bg-success bg-opacity-10 text-success',
@@ -20,19 +24,20 @@ define(['core/ajax'], function(Ajax) {
 
     // ---------------------------------------------------------------
     function BlockState(blockid, config) {
-        this.blockid    = blockid;
-        this.config     = config;
-        this.search     = '';
-        this.cats       = {};      // {catid: true}
-        this.types      = {};
-        this.diffs      = {};
-        this.tags       = [];
-        this.selected   = {};
-        this.results    = [];
-        this.allCats    = [];
-        this.panelOpen  = false;
-        this.panelQuery = '';
-        this.debounce   = null;
+        this.blockid      = blockid;
+        this.config       = config;
+        this.search       = '';
+        this.cats         = {};
+        this.types        = {};
+        this.diffs        = {};
+        this.tags         = [];
+        this.selected     = {};
+        this.results      = [];
+        this.allCats      = [];
+        this.loadedQtypes = [];   // [{key, label}] — dynamisch aus DB
+        this.panelOpen    = false;
+        this.panelQuery   = '';
+        this.debounce     = null;
     }
 
     BlockState.prototype.el = function(id) {
@@ -48,7 +53,8 @@ define(['core/ajax'], function(Ajax) {
     BlockState.prototype.init = function() {
         var self = this;
 
-        self.renderTypeChips();
+        // Fragetypen dynamisch laden statt hart kodiert
+        self.loadQuestionTypes();
 
         // Diff-Chips
         self.block().querySelectorAll('.qf-chip-diff').forEach(function(btn) {
@@ -190,6 +196,35 @@ define(['core/ajax'], function(Ajax) {
 
     BlockState.prototype.togglePanel = function() {
         if (this.panelOpen) this.closePanel(); else this.openPanel();
+    };
+
+    // ---------------------------------------------------------------
+    // Fragetypen dynamisch laden
+    // ---------------------------------------------------------------
+    BlockState.prototype.loadQuestionTypes = function() {
+        var self = this;
+        var wrap = self.el('type-chips');
+        if (wrap) wrap.innerHTML = '<span class="text-muted small">Typen werden geladen …</span>';
+
+        Ajax.call([{
+            methodname: 'block_questionfilter_get_questiontypes',
+            args: {
+                scope:     self.config.searchscope || 'all',
+                contextid: self.config.contextid   || 1,
+                source:    self.config.qtypessource || 'installed',
+            },
+            done: function(result) {
+                self.loadedQtypes = result.qtypes || [];
+                self.renderTypeChips();
+            },
+            fail: function() {
+                // Fallback: bekannte Typen aus QTYPE_FALLBACK
+                self.loadedQtypes = Object.keys(QTYPE_FALLBACK).map(function(k) {
+                    return { key: k, label: QTYPE_FALLBACK[k] };
+                });
+                self.renderTypeChips();
+            },
+        }]);
     };
 
     // ---------------------------------------------------------------
@@ -344,10 +379,15 @@ define(['core/ajax'], function(Ajax) {
         var self = this;
         var wrap = self.el('type-chips');
         if (!wrap) return;
+        if (!self.loadedQtypes.length) {
+            wrap.innerHTML = '<span class="text-muted small">Keine Fragetypen gefunden.</span>';
+            return;
+        }
         var html = '';
-        Object.keys(QTYPES).forEach(function(k) {
-            html += '<button class="badge qf-chip qf-chip-type" data-type="' + k + '">'
-                  + QTYPES[k] + '</button> ';
+        self.loadedQtypes.forEach(function(t) {
+            var active = self.types[t.key] ? ' qf-chip-active' : '';
+            html += '<button class="badge qf-chip qf-chip-type' + active + '" data-type="' + t.key + '">'
+                  + escHtml(t.label) + '</button> ';
         });
         wrap.innerHTML = html;
         wrap.querySelectorAll('.qf-chip-type').forEach(function(btn) {
@@ -457,7 +497,11 @@ define(['core/ajax'], function(Ajax) {
         var html = '';
         self.results.forEach(function(q) {
             var sel     = !!self.selected[q.id];
-            var typeLbl = QTYPES[q.qtype] || q.qtype;
+            // Anzeigenamen aus dynamisch geladenen Typen auflösen
+            var typeLbl = QTYPE_FALLBACK[q.qtype] || q.qtype;
+            self.loadedQtypes.forEach(function(t) {
+                if (t.key === q.qtype) typeLbl = t.label;
+            });
             var typeCol = TYPE_COLOR[q.qtype] || 'bg-secondary bg-opacity-10 text-secondary';
             var tagPills= (q.tags || []).map(function(t) {
                 return '<span class="badge bg-primary bg-opacity-10 text-primary" style="font-size:10px">#'

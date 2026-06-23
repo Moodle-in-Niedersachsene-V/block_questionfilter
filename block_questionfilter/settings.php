@@ -22,6 +22,24 @@ if ($ADMIN->fulltree) {
         ]
     ));
 
+    // --- Fragetypen-Anzeige ---
+    $settings->add(new admin_setting_heading(
+        'block_questionfilter/questiontypes_heading',
+        get_string('settings_questiontypes_heading', 'block_questionfilter'),
+        ''
+    ));
+
+    $settings->add(new admin_setting_configselect(
+        'block_questionfilter/questiontypes_source',
+        get_string('settings_questiontypes_source', 'block_questionfilter'),
+        get_string('settings_questiontypes_source_help', 'block_questionfilter'),
+        'installed',
+        [
+            'installed' => get_string('qtypes_installed', 'block_questionfilter'),
+            'existing'  => get_string('qtypes_existing',  'block_questionfilter'),
+        ]
+    ));
+
     // --- Niveaustufen (erweiterbar) ---
     $settings->add(new admin_setting_heading(
         'block_questionfilter/difficulty_heading',
