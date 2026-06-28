@@ -68,3 +68,10 @@ $string['settings_questiontypes_source']       = 'Displayed question types';
 $string['settings_questiontypes_source_help']  = 'All installed: shows all qtype plugins. Existing only: shows only types that have questions in the bank.';
 $string['qtypes_installed'] = 'All installed question types';
 $string['qtypes_existing']  = 'Only types with existing questions';
+
+// Capability strings without block_ prefix (required by Moodle accesslib)
+$string['questionfilter:view']         = 'Use the question bank filter block';
+$string['questionfilter:export']       = 'Export questions';
+$string['questionfilter:addinstance']  = 'Add a Question bank filter block';
+$string['questionfilter:myaddinstance']= 'Add a Question bank filter block to Dashboard';
+$string['privacy:metadata'] = 'The question bank filter block does not store any personal data. Export files are generated temporarily and not stored permanently.';

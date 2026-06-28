@@ -1,4 +1,8 @@
 <?php
+// This file is part of Moodle - https://moodle.org/
+// Copyright: 2026 Moodle in Niedersachsen e. V.
+// License:   https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+
 defined('MOODLE_INTERNAL') || die();
 
 function xmldb_block_questionfilter_upgrade(int $oldversion): bool {

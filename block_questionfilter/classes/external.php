@@ -1,4 +1,8 @@
 <?php
+// This file is part of Moodle - https://moodle.org/
+// Copyright: 2026 Moodle in Niedersachsen e. V.
+// License:   https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+
 defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->libdir . '/externallib.php');
@@ -43,6 +47,12 @@ class block_questionfilter_external extends external_api {
             'contextid'  => $contextid,
             'limit'      => $limit,
         ]);
+
+        // Limit auf konfigurierten Maximalwert deckeln (DoS-Schutz)
+        $maxlimit = (int)(get_config('block_questionfilter', 'resultlimit') ?: 200);
+        if ($params['limit'] < 1 || $params['limit'] > $maxlimit) {
+            $params['limit'] = $maxlimit;
+        }
 
         // Berechtigungsprüfung — eigene Capability, Gäste können erlaubt werden
         $context = context::instance_by_id($params['contextid']);

@@ -65,3 +65,10 @@ $string['settings_questiontypes_source']       = 'Angezeigte Fragetypen';
 $string['settings_questiontypes_source_help']  = 'Alle installierten: zeigt alle qtype-Plugins. Nur vorhandene: zeigt nur Typen die tatsächlich Fragen in der Bank haben.';
 $string['qtypes_installed'] = 'Alle installierten Fragetypen';
 $string['qtypes_existing']  = 'Nur Typen mit vorhandenen Fragen';
+
+// Capability-Strings ohne block_-Präfix (von Moodle accesslib benötigt)
+$string['questionfilter:view']         = 'Fragebank-Filter-Block verwenden';
+$string['questionfilter:export']       = 'Fragen exportieren';
+$string['questionfilter:addinstance']  = 'Block „Fragebank-Filter" hinzufügen';
+$string['questionfilter:myaddinstance']= 'Block „Fragebank-Filter" zum Dashboard hinzufügen';
+$string['privacy:metadata'] = 'Der Fragebank-Filter-Block speichert keine personenbezogenen Daten. Export-Dateien werden nur temporär erzeugt und nicht dauerhaft gespeichert.';

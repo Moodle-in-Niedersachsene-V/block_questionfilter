@@ -1,4 +1,8 @@
 <?php
+// This file is part of Moodle - https://moodle.org/
+// Copyright: 2026 Moodle in Niedersachsen e. V.
+// License:   https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+
 defined('MOODLE_INTERNAL') || die();
 
 class block_questionfilter_renderer extends plugin_renderer_base {
