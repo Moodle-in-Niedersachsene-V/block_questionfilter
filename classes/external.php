@@ -16,7 +16,7 @@
 
 /**
  * Webservice-Funktionen des Plugins block_questionfilter.
-     *
+ *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @author     Moodle in Niedersachsen e. V.
@@ -29,7 +29,7 @@ require_once($CFG->libdir . '/externallib.php');
 
 /**
  * Webservice-Funktionen des Fragebank-Filters.
-     *
+ *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -801,7 +801,8 @@ class block_questionfilter_external extends external_api {
                JOIN {question_versions} qv ON qv.questionid = q.id
                JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
                JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
-              WHERE q.id $insql", $args
+              WHERE q.id $insql",
+            $args
         );
 
         $csvquote = function (string $s): string {
@@ -844,7 +845,9 @@ class block_questionfilter_external extends external_api {
             foreach ($ids as $qid) {
                 try {
                     $q = question_bank::load_question($qid);
-                    if ($q) $questions[] = $q;
+                    if ($q) {
+                        $questions[] = $q;
+                    }
                 } catch (Exception $e) {
                     // Fehlerhafte Frage wird uebersprungen.
                     debugging($e->getMessage(), DEBUG_DEVELOPER);
@@ -877,7 +880,8 @@ class block_questionfilter_external extends external_api {
                JOIN {question_versions} qv ON qv.questionid = q.id
                JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
                JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
-              WHERE q.id $insql", $args
+              WHERE q.id $insql",
+            $args
         );
 
         $out = '// GIFT Export – ' . date('Y-m-d H:i:s') . "\n\n";
