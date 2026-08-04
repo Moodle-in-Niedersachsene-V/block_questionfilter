@@ -43,7 +43,7 @@ $functions = [
         'description' => 'Sucht Testfragen über mehrere Fragesammlungen',
         'type' => 'read',
         'ajax' => true,
-        'loginrequired' => false, // Gäste erlaubt — Capability-Prüfung in der Methode
+        'loginrequired' => false,
         'capabilities' => 'block/questionfilter:view',
     ],
 
@@ -53,7 +53,7 @@ $functions = [
         'description' => 'Lädt alle durchsuchbaren Fragekategorien',
         'type' => 'read',
         'ajax' => true,
-        'loginrequired' => false, // Gäste erlaubt
+        'loginrequired' => false,
         'capabilities' => 'block/questionfilter:view',
     ],
 
@@ -63,7 +63,7 @@ $functions = [
         'description' => 'Exportiert ausgewählte Fragen (XML, CSV, GIFT)',
         'type' => 'read',
         'ajax' => true,
-        'loginrequired' => true, // Export nur für angemeldete Nutzer mit export-Capability
+        'loginrequired' => true,
         'capabilities' => 'block/questionfilter:export',
     ],
 ];

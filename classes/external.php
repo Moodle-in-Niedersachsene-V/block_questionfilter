@@ -1,22 +1,22 @@
 <?php
-// This file is part of Moodle - https://moodle.org/.
+// This file is part of Moodle - https://moodle.org/
 //
-// Moodle is free software: you can redistribute it and/or modify.
-// It under the terms of the GNU General Public License as published by.
-// The Free Software Foundation, either version 3 of the License, or.
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// Moodle is distributed in the hope that it will be useful,.
-// But WITHOUT ANY WARRANTY; without even the implied warranty of.
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the.
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License.
-// Along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
  * Webservice-Funktionen des Plugins block_questionfilter.
- *
+     *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @author     Moodle in Niedersachsen e. V.
@@ -29,7 +29,7 @@ require_once($CFG->libdir . '/externallib.php');
 
 /**
  * Webservice-Funktionen des Fragebank-Filters.
- *
+     *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -274,8 +274,10 @@ class block_questionfilter_external extends external_api {
     public static function get_categories(string $scope, int $contextid): array {
         global $DB;
 
-        $params = self::validate_parameters(self::get_categories_parameters(),
-            ['scope' => $scope, 'contextid' => $contextid]);
+        $params = self::validate_parameters(
+            self::get_categories_parameters(),
+            ['scope' => $scope, 'contextid' => $contextid]
+        );
         $context = context::instance_by_id($params['contextid']);
         self::validate_context($context);
 
@@ -356,8 +358,10 @@ class block_questionfilter_external extends external_api {
     public static function get_questiontypes(string $scope, int $contextid, string $source = 'installed'): array {
         global $DB, $CFG;
 
-        $params = self::validate_parameters(self::get_questiontypes_parameters(),
-            ['scope' => $scope, 'contextid' => $contextid, 'source' => $source]);
+        $params = self::validate_parameters(
+            self::get_questiontypes_parameters(),
+            ['scope' => $scope, 'contextid' => $contextid, 'source' => $source]
+        );
         $context = context::instance_by_id($params['contextid']);
         self::validate_context($context);
 
@@ -492,7 +496,7 @@ class block_questionfilter_external extends external_api {
                 $filename = 'questions_' . date('Ymd_His') . '.txt';
                 $mimetype = 'text/plain';
                 break;
-            default: // xml
+            default:
                 $content = self::export_moodle_xml($ids);
                 $filename = 'questions_' . date('Ymd_His') . '.xml';
                 $mimetype = 'application/xml';
@@ -546,7 +550,6 @@ class block_questionfilter_external extends external_api {
         ]);
     }
 
-
     /**
      * Alle durchsuchbaren Kontext-IDs je nach Suchbereich ermitteln.
      *
@@ -560,12 +563,16 @@ class block_questionfilter_external extends external_api {
      * - 'system' : nur System-Kontext
      * - 'course' : aktueller Kurs-Kontext (+ mod_qbank-Kontexte im Kurs bei Moodle 5)
      * - 'all'    : System + alle Kurse + alle mod_qbank-Kontexte (Moodle 5)
+     *
+     * @param string $scope Suchbereich: all, course oder system.
+     * @param int $contextid ID des aktuellen Kontexts.
+     * @return array Liste der Kontext-IDs.
      */
     private static function get_searchable_contextids(string $scope, int $contextid): array {
         global $DB, $CFG;
 
         $sysctx = context_system::instance();
-        $ismoodle5 = (int)$CFG->version >= 2024100700; // Moodle 5.0 = 2024100700
+        $ismoodle5 = (int)$CFG->version >= 2024100700; // Entspricht Moodle 5.0.
 
         if ($scope === 'system') {
             return [$sysctx->id];
@@ -584,7 +591,7 @@ class block_questionfilter_external extends external_api {
             return $ids;
         }
 
-        // 'all': System + alle Kurs-Kontexte.
+        // Suchbereich all umfasst System- und alle Kurs-Kontexte.
         $coursectxids = $DB->get_fieldset_sql(
             "SELECT id FROM {context} WHERE contextlevel = :lvl",
             ['lvl' => CONTEXT_COURSE]
@@ -607,6 +614,9 @@ class block_questionfilter_external extends external_api {
      *
      * Moodle 5.0+ speichert Fragebanken als mod_qbank-Aktivitäten.
      * Die Fragekategorien hängen am Modul-Kontext (contextlevel = 70).
+     *
+     * @param int|null $courseid Kurs-ID oder null fuer alle Kurse.
+     * @return array Liste der Kontext-IDs.
      */
     private static function get_qbank_module_contextids(?int $courseid): array {
         global $DB;
@@ -634,6 +644,9 @@ class block_questionfilter_external extends external_api {
 
     /**
      * Tags einer Frage laden.
+     *
+     * @param int $questionid ID der Frage.
+     * @return array Liste der Tags.
      */
     private static function get_question_tags(int $questionid): array {
         global $DB;
@@ -656,6 +669,10 @@ class block_questionfilter_external extends external_api {
      * Lesbares Label für den Kontext einer Kategorie.
      * Für mod_qbank-Instanzen (Moodle 5) wird der tatsächliche
      * Name der Fragebank aus der qbank-Instanztabelle gelesen.
+     *
+     * @param int $contextlevel Kontextebene.
+     * @param int $instanceid ID der Kontextinstanz.
+     * @return string Lesbare Bezeichnung.
      */
     private static function context_label(int $contextlevel, int $instanceid): string {
         global $DB;
@@ -689,7 +706,7 @@ class block_questionfilter_external extends external_api {
                     if ($bankname) {
                         return $coursename . ' › ' . $bankname;
                     }
-                } elseif ($modname === 'quiz') {
+                } else if ($modname === 'quiz') {
                     $quizname = $DB->get_field('quiz', 'name', ['id' => $cm->instance]);
                     if ($quizname) {
                         return $coursename . ' › Quiz: ' . $quizname;
@@ -704,7 +721,6 @@ class block_questionfilter_external extends external_api {
         }
     }
 
-
     /**
      * Moodle XML-Export über die native qformat_xml-Engine.
      *
@@ -712,6 +728,9 @@ class block_questionfilter_external extends external_api {
      * (wie aus der DB), nicht question_definition-Objekte von load_question().
      * get_question_options() lädt Antworten, Hints und Unterfragen (multianswer)
      * direkt in die stdClass — das ist der korrekte Weg für den Export.
+     *
+     * @param array $ids Liste der Fragen-IDs.
+     * @return string Inhalt der Exportdatei.
      */
     private static function export_moodle_xml(array $ids): string {
         global $CFG, $DB;
@@ -741,7 +760,7 @@ class block_questionfilter_external extends external_api {
         // Und bei qtype_multianswer mit den Unterfragen (subquestions als stdClass).
         $questions = [];
         foreach ($rows as $q) {
-            get_question_options($q);   // modifiziert $q in-place
+            get_question_options($q); // Ergaenzt $q um Antworten und Hinweise.
             $questions[] = $q;
         }
 
@@ -768,6 +787,9 @@ class block_questionfilter_external extends external_api {
     /**
      * CSV-Export: ID, Name, Typ, Kategorie, Tags.
      * RFC 4180-konformes Quoting (doppelte Anführungszeichen escapen).
+     *
+     * @param array $ids Liste der Fragen-IDs.
+     * @return string Inhalt der Exportdatei.
      */
     private static function export_csv(array $ids): string {
         global $DB;
@@ -782,7 +804,7 @@ class block_questionfilter_external extends external_api {
               WHERE q.id $insql", $args
         );
 
-        $csvquote = function(string $s): string {
+        $csvquote = function (string $s): string {
             return '"' . str_replace('"', '""', $s) . '"';
         };
 
@@ -804,6 +826,9 @@ class block_questionfilter_external extends external_api {
     /**
      * GIFT-Export über Moodles native qformat_gift-Engine (falls verfügbar),
      * sonst einfaches Fallback-Format.
+     *
+     * @param array $ids Liste der Fragen-IDs.
+     * @return string Inhalt der Exportdatei.
      */
     private static function export_gift(array $ids): string {
         global $CFG, $DB;
@@ -821,7 +846,8 @@ class block_questionfilter_external extends external_api {
                     $q = question_bank::load_question($qid);
                     if ($q) $questions[] = $q;
                 } catch (Exception $e) {
-                    // Überspringen.
+                    // Fehlerhafte Frage wird uebersprungen.
+                    debugging($e->getMessage(), DEBUG_DEVELOPER);
                 }
             }
 
@@ -831,9 +857,12 @@ class block_questionfilter_external extends external_api {
                 foreach ($questions as $q) {
                     try {
                         $line = $qformat->writequestion($q);
-                        if ($line) $output .= $line . "\n";
+                        if ($line) {
+                            $output .= $line . "\n";
+                        }
                     } catch (Exception $e) {
-                        // Überspringen.
+                        // Fehlerhafte Frage wird uebersprungen.
+                        debugging($e->getMessage(), DEBUG_DEVELOPER);
                     }
                 }
                 return $output;
