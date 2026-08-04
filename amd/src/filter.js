@@ -1,43 +1,48 @@
-// block_questionfilter/amd/src/filter.js
-define(['core/ajax'], function(Ajax) {
+// AMD-Modul des Fragebank-Filters (block_questionfilter).
+define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
     'use strict';
 
     // Fragetypen werden dynamisch geladen — diese Map dient nur als
     // Anzeigenamen-Fallback falls get_questiontypes keinen Treffer liefert
     var QTYPE_FALLBACK = {
-        multichoice:'Multiple Choice', truefalse:'Wahr/Falsch',
-        shortanswer:'Kurzantwort',     numerical:'Numerisch',
-        essay:'Freitext',              match:'Zuordnung',
-        ddwtos:'Drag & Drop',          gapselect:'Lückentext',
-        calculated:'Berechnet',        description:'Beschreibung',
-        stack:'STACK',                 kprime:'KPrime',
-        mtf:'MTF',                     recordrtc:'Audioaufnahme',
+        multichoice: 'Multiple Choice', truefalse: 'Wahr/Falsch',
+        shortanswer: 'Kurzantwort', numerical: 'Numerisch',
+        essay: 'Freitext', match: 'Zuordnung',
+        ddwtos: 'Drag & Drop', gapselect: 'Lückentext',
+        calculated: 'Berechnet', description: 'Beschreibung',
+        stack: 'STACK', kprime: 'KPrime',
+        mtf: 'MTF', recordrtc: 'Audioaufnahme',
     };
     var TYPE_COLOR = {
-        multichoice:'bg-success bg-opacity-10 text-success',
-        truefalse:  'bg-info bg-opacity-10 text-info',
-        shortanswer:'bg-warning bg-opacity-10 text-warning',
-        numerical:  'bg-primary bg-opacity-10 text-primary',
-        essay:      'bg-secondary bg-opacity-10 text-secondary',
-        match:      'bg-info bg-opacity-10 text-info',
+        multichoice: 'bg-success bg-opacity-10 text-success',
+        truefalse: 'bg-info bg-opacity-10 text-info',
+        shortanswer: 'bg-warning bg-opacity-10 text-warning',
+        numerical: 'bg-primary bg-opacity-10 text-primary',
+        essay: 'bg-secondary bg-opacity-10 text-secondary',
+        match: 'bg-info bg-opacity-10 text-info',
     };
 
-    // ---------------------------------------------------------------
+    /**
+     * Zustandsobjekt einer Blockinstanz.
+     *
+     * @param {Number} blockid ID der Blockinstanz.
+     * @param {Object} config Konfiguration aus PHP.
+     */
     function BlockState(blockid, config) {
-        this.blockid      = blockid;
-        this.config       = config;
-        this.search       = '';
-        this.cats         = {};
-        this.types        = {};
-        this.diffs        = {};
-        this.tags         = [];
-        this.selected     = {};
-        this.results      = [];
-        this.allCats      = [];
-        this.loadedQtypes = [];   // [{key, label}] — dynamisch aus DB
-        this.panelOpen    = false;
-        this.panelQuery   = '';
-        this.debounce     = null;
+        this.blockid = blockid;
+        this.config = config;
+        this.search = '';
+        this.cats = {};
+        this.types = {};
+        this.diffs = {};
+        this.tags = [];
+        this.selected = {};
+        this.results = [];
+        this.allCats = [];
+        this.loadedQtypes = []; // [{key, label}] — dynamisch aus DB
+        this.panelOpen = false;
+        this.panelQuery = '';
+        this.debounce = null;
     }
 
     BlockState.prototype.el = function(id) {
@@ -47,9 +52,7 @@ define(['core/ajax'], function(Ajax) {
         return document.getElementById('qf-block-' + this.blockid);
     };
 
-    // ---------------------------------------------------------------
     // Init
-    // ---------------------------------------------------------------
     BlockState.prototype.init = function() {
         var self = this;
 
@@ -60,8 +63,13 @@ define(['core/ajax'], function(Ajax) {
         self.block().querySelectorAll('.qf-chip-diff').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 var v = this.dataset.value;
-                if (self.diffs[v]) { delete self.diffs[v]; this.classList.remove('qf-chip-active'); }
-                else               { self.diffs[v] = true;  this.classList.add('qf-chip-active'); }
+                if (self.diffs[v]) {
+                    delete self.diffs[v];
+                    this.classList.remove('qf-chip-active');
+                } else {
+                    self.diffs[v] = true;
+                    this.classList.add('qf-chip-active');
+                }
                 self.triggerSearch();
             });
         });
@@ -99,7 +107,9 @@ define(['core/ajax'], function(Ajax) {
         if (filterInput) {
             filterInput.addEventListener('click', function(e) {
                 e.stopPropagation();
-                if (!self.panelOpen) self.openPanel();
+                if (!self.panelOpen) {
+                    self.openPanel();
+                }
             });
         }
 
@@ -110,7 +120,9 @@ define(['core/ajax'], function(Ajax) {
                 self.panelQuery = this.value.toLowerCase();
                 self.renderPanelList();
             });
-            panelSearch.addEventListener('click', function(e) { e.stopPropagation(); });
+            panelSearch.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
         }
 
         // Alle / Keine
@@ -118,20 +130,28 @@ define(['core/ajax'], function(Ajax) {
         if (wrap) {
             var selAll = wrap.querySelector('.qf-cat-sel-all');
             var selNone = wrap.querySelector('.qf-cat-sel-none');
-            if (selAll) selAll.addEventListener('click', function(e) {
-                e.stopPropagation();
-                self.filteredCats().forEach(function(c) { self.cats[c.id] = true; });
-                self.renderPanelList();
-                self.updateCatInput();
-                self.triggerSearch();
-            });
-            if (selNone) selNone.addEventListener('click', function(e) {
-                e.stopPropagation();
-                self.filteredCats().forEach(function(c) { delete self.cats[c.id]; });
-                self.renderPanelList();
-                self.updateCatInput();
-                self.triggerSearch();
-            });
+            if (selAll) {
+                selAll.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    self.filteredCats().forEach(function(c) {
+                        self.cats[c.id] = true;
+                    });
+                    self.renderPanelList();
+                    self.updateCatInput();
+                    self.triggerSearch();
+                });
+            }
+            if (selNone) {
+                selNone.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    self.filteredCats().forEach(function(c) {
+                        delete self.cats[c.id];
+                    });
+                    self.renderPanelList();
+                    self.updateCatInput();
+                    self.triggerSearch();
+                });
+            }
         }
 
         // X-Button: Auswahl aufheben
@@ -150,68 +170,94 @@ define(['core/ajax'], function(Ajax) {
         document.addEventListener('click', function(e) {
             if (self.panelOpen) {
                 var wrap = self.el('catdrop-wrap');
-                if (wrap && !wrap.contains(e.target)) self.closePanel();
+                if (wrap && !wrap.contains(e.target)) {
+                    self.closePanel();
+                }
             }
         });
 
-        // Alle wählen (Ergebnisse)
-        var selAll = self.block().querySelector('.qf-select-all');
-        if (selAll) selAll.addEventListener('click', function() { self.toggleSelectAll(); });
+        // Alle wählen (Ergebnisse).
+        var selAllResults = self.block().querySelector('.qf-select-all');
+        if (selAllResults) {
+            selAllResults.addEventListener('click', function() {
+                self.toggleSelectAll();
+            });
+        }
 
         // Export
         self.block().querySelectorAll('.qf-export').forEach(function(btn) {
-            btn.addEventListener('click', function() { self.doExport(this.dataset.format); });
+            btn.addEventListener('click', function() {
+                self.doExport(this.dataset.format);
+            });
         });
         var addQuiz = self.block().querySelector('.qf-add-to-quiz');
-        if (addQuiz) addQuiz.addEventListener('click', function() { self.addToQuiz(); });
+        if (addQuiz) {
+            addQuiz.addEventListener('click', function() {
+                self.addToQuiz();
+            });
+        }
 
         self.loadCategories();
     };
 
-    // ---------------------------------------------------------------
     // Dropdown Panel
-    // ---------------------------------------------------------------
     BlockState.prototype.openPanel = function() {
-        var self  = this;
+        var self = this;
         var panel = self.el('cat-panel');
-        var icon  = self.el('cat-toggle');
-        if (!panel) return;
+        var icon = self.el('cat-toggle');
+        if (!panel) {
+            return;
+        }
         panel.style.display = 'flex';
         self.panelOpen = true;
-        if (icon) icon.innerHTML = '<i class="fa fa-chevron-up" style="font-size:11px"></i>';
+        if (icon) {
+            icon.innerHTML = '<i class="fa fa-chevron-up" style="font-size:11px"></i>';
+        }
         // Suchfeld fokussieren
         var ps = self.el('cat-search');
-        if (ps) setTimeout(function() { ps.focus(); }, 50);
+        if (ps) {
+            setTimeout(function() {
+                ps.focus();
+            }, 50);
+        }
     };
 
     BlockState.prototype.closePanel = function() {
-        var self  = this;
+        var self = this;
         var panel = self.el('cat-panel');
-        var icon  = self.el('cat-toggle');
-        if (!panel) return;
+        var icon = self.el('cat-toggle');
+        if (!panel) {
+            return;
+        }
         panel.style.display = 'none';
         self.panelOpen = false;
-        if (icon) icon.innerHTML = '<i class="fa fa-chevron-down" style="font-size:11px"></i>';
+        if (icon) {
+            icon.innerHTML = '<i class="fa fa-chevron-down" style="font-size:11px"></i>';
+        }
     };
 
     BlockState.prototype.togglePanel = function() {
-        if (this.panelOpen) this.closePanel(); else this.openPanel();
+        if (this.panelOpen) {
+            this.closePanel();
+        } else {
+            this.openPanel();
+        }
     };
 
-    // ---------------------------------------------------------------
     // Fragetypen dynamisch laden
-    // ---------------------------------------------------------------
     BlockState.prototype.loadQuestionTypes = function() {
         var self = this;
         var wrap = self.el('type-chips');
-        if (wrap) wrap.innerHTML = '<span class="text-muted small">Typen werden geladen …</span>';
+        if (wrap) {
+            wrap.innerHTML = '<span class="text-muted small">Typen werden geladen …</span>';
+        }
 
         Ajax.call([{
             methodname: 'block_questionfilter_get_questiontypes',
             args: {
-                scope:     self.config.searchscope || 'all',
-                contextid: self.config.contextid   || 1,
-                source:    self.config.qtypessource || 'installed',
+                scope: self.config.searchscope || 'all',
+                contextid: self.config.contextid || 1,
+                source: self.config.qtypessource || 'installed',
             },
             done: function(result) {
                 self.loadedQtypes = result.qtypes || [];
@@ -220,22 +266,20 @@ define(['core/ajax'], function(Ajax) {
             fail: function() {
                 // Fallback: bekannte Typen aus QTYPE_FALLBACK
                 self.loadedQtypes = Object.keys(QTYPE_FALLBACK).map(function(k) {
-                    return { key: k, label: QTYPE_FALLBACK[k] };
+                    return {key: k, label: QTYPE_FALLBACK[k]};
                 });
                 self.renderTypeChips();
             },
         }]);
     };
 
-    // ---------------------------------------------------------------
     // Kategorien
-    // ---------------------------------------------------------------
     BlockState.prototype.loadCategories = function() {
-        var self      = this;
-        var filterEl  = self.el('cat-filter');
+        var self = this;
+        var filterEl = self.el('cat-filter');
         Ajax.call([{
             methodname: 'block_questionfilter_get_categories',
-            args: { scope: self.config.searchscope || 'all', contextid: self.config.contextid || 1 },
+            args: {scope: self.config.searchscope || 'all', contextid: self.config.contextid || 1},
             done: function(result) {
                 self.allCats = result.categories || [];
                 if (filterEl) {
@@ -246,7 +290,9 @@ define(['core/ajax'], function(Ajax) {
                 self.renderPanelList();
             },
             fail: function() {
-                if (filterEl) filterEl.placeholder = 'Laden fehlgeschlagen';
+                if (filterEl) {
+                    filterEl.placeholder = 'Laden fehlgeschlagen';
+                }
             },
         }]);
     };
@@ -254,7 +300,9 @@ define(['core/ajax'], function(Ajax) {
     // Gefilterte Liste (nach panelQuery)
     BlockState.prototype.filteredCats = function() {
         var q = this.panelQuery;
-        if (!q) return this.allCats;
+        if (!q) {
+            return this.allCats;
+        }
         return this.allCats.filter(function(c) {
             return c.name.toLowerCase().indexOf(q) !== -1
                 || (c.contextlabel || '').toLowerCase().indexOf(q) !== -1;
@@ -263,26 +311,30 @@ define(['core/ajax'], function(Ajax) {
 
     // Zeigt gewählte Sammlungen im Eingabefeld an
     BlockState.prototype.updateCatInput = function() {
-        var self     = this;
+        var self = this;
         var filterEl = self.el('cat-filter');
         var clearBtn = self.el('cat-clear');
-        var label    = self.el('cat-label');
-        var n        = Object.keys(self.cats).length;
-        var total    = self.allCats.length;
+        var label = self.el('cat-label');
+        var n = Object.keys(self.cats).length;
+        var total = self.allCats.length;
 
         if (filterEl) {
             if (n === 0) {
                 filterEl.value = '';
                 filterEl.placeholder = total + ' Sammlungen verfügbar …';
             } else if (n === 1) {
-                var id  = parseInt(Object.keys(self.cats)[0], 10);
-                var cat = self.allCats.filter(function(c) { return c.id === id; })[0];
+                var id = parseInt(Object.keys(self.cats)[0], 10);
+                var cat = self.allCats.filter(function(c) {
+                    return c.id === id;
+                })[0];
                 filterEl.value = cat ? cat.name : '1 gewählt';
             } else {
                 filterEl.value = n + ' Sammlungen gewählt';
             }
         }
-        if (clearBtn) clearBtn.style.display = n > 0 ? '' : 'none';
+        if (clearBtn) {
+            clearBtn.style.display = n > 0 ? '' : 'none';
+        }
         if (label) {
             label.textContent = 'FRAGESAMMLUNGEN'
                 + (n > 0 ? ' (' + n + ' aktiv)' : '')
@@ -294,7 +346,9 @@ define(['core/ajax'], function(Ajax) {
     BlockState.prototype.renderPanelList = function() {
         var self = this;
         var list = self.el('cat-list');
-        if (!list) return;
+        if (!list) {
+            return;
+        }
 
         var cats = self.filteredCats();
 
@@ -305,10 +359,13 @@ define(['core/ajax'], function(Ajax) {
 
         // Gruppierung nach contextlabel
         var groups = {};
-        var order  = [];
+        var order = [];
         cats.forEach(function(c) {
             var lbl = c.contextlabel || 'Allgemein';
-            if (!groups[lbl]) { groups[lbl] = []; order.push(lbl); }
+            if (!groups[lbl]) {
+                groups[lbl] = [];
+                order.push(lbl);
+            }
             groups[lbl].push(c);
         });
 
@@ -343,23 +400,27 @@ define(['core/ajax'], function(Ajax) {
             chk.addEventListener('change', function(e) {
                 e.stopPropagation();
                 var id = parseInt(this.dataset.catid, 10);
-                if (this.checked) self.cats[id] = true; else delete self.cats[id];
+                if (this.checked) {
+                    self.cats[id] = true;
+                } else {
+                    delete self.cats[id];
+                }
                 // Zeile hervorheben
                 var row = this.closest('.qf-cat-row');
-                if (row) row.classList.toggle('qf-cat-row-active', !!this.checked);
+                if (row) {
+                    row.classList.toggle('qf-cat-row-active', !!this.checked);
+                }
                 self.updateCatInput();
                 self.triggerSearch();
             });
         });
     };
 
-    // ---------------------------------------------------------------
     // Suchfeld parsen
-    // ---------------------------------------------------------------
     BlockState.prototype.parseSearchInput = function(val) {
-        var self  = this;
+        var self = this;
         var plain = val.trim();
-        var hint  = self.el('search-hint');
+        var hint = self.el('search-hint');
         if (hint) {
             if (plain.charAt(0) === '#' && plain.length > 1) {
                 hint.textContent = 'Enter: "' + plain.substring(1) + '" als Tag-Filter';
@@ -372,13 +433,13 @@ define(['core/ajax'], function(Ajax) {
         self.triggerSearch();
     };
 
-    // ---------------------------------------------------------------
     // Fragetyp-Chips
-    // ---------------------------------------------------------------
     BlockState.prototype.renderTypeChips = function() {
         var self = this;
         var wrap = self.el('type-chips');
-        if (!wrap) return;
+        if (!wrap) {
+            return;
+        }
         if (!self.loadedQtypes.length) {
             wrap.innerHTML = '<span class="text-muted small">Keine Fragetypen gefunden.</span>';
             return;
@@ -393,16 +454,19 @@ define(['core/ajax'], function(Ajax) {
         wrap.querySelectorAll('.qf-chip-type').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 var t = this.dataset.type;
-                if (self.types[t]) { delete self.types[t]; this.classList.remove('qf-chip-active'); }
-                else               { self.types[t] = true;  this.classList.add('qf-chip-active'); }
+                if (self.types[t]) {
+                    delete self.types[t];
+                    this.classList.remove('qf-chip-active');
+                } else {
+                    self.types[t] = true;
+                    this.classList.add('qf-chip-active');
+                }
                 self.triggerSearch();
             });
         });
     };
 
-    // ---------------------------------------------------------------
     // Tags
-    // ---------------------------------------------------------------
     BlockState.prototype.addTag = function(val) {
         if (val && this.tags.indexOf(val) === -1) {
             this.tags.push(val);
@@ -411,15 +475,22 @@ define(['core/ajax'], function(Ajax) {
         }
     };
     BlockState.prototype.removeTag = function(val) {
-        this.tags = this.tags.filter(function(t) { return t !== val; });
+        this.tags = this.tags.filter(function(t) {
+            return t !== val;
+        });
         this.renderTagChips();
         this.triggerSearch();
     };
     BlockState.prototype.renderTagChips = function() {
         var self = this;
         var wrap = self.el('tag-chips');
-        if (!wrap) return;
-        if (!self.tags.length) { wrap.innerHTML = ''; return; }
+        if (!wrap) {
+            return;
+        }
+        if (!self.tags.length) {
+            wrap.innerHTML = '';
+            return;
+        }
         wrap.innerHTML = self.tags.map(function(t) {
             return '<span class="badge qf-chip qf-chip-tag qf-chip-active">#' + escHtml(t)
                  + ' <button class="qf-rm-tag" data-tag="' + escHtml(t)
@@ -434,76 +505,92 @@ define(['core/ajax'], function(Ajax) {
         });
     };
 
-    // ---------------------------------------------------------------
     // Suche
-    // ---------------------------------------------------------------
     BlockState.prototype.triggerSearch = function() {
         var self = this;
         clearTimeout(self.debounce);
-        self.debounce = setTimeout(function() { self.runSearch(); }, 350);
+        self.debounce = setTimeout(function() {
+            self.runSearch();
+        }, 350);
     };
 
     BlockState.prototype.runSearch = function() {
-        var self    = this;
+        var self = this;
         var spinner = self.el('spinner');
-        if (spinner) spinner.classList.remove('d-none');
+        if (spinner) {
+            spinner.classList.remove('d-none');
+        }
 
         Ajax.call([{
             methodname: 'block_questionfilter_search_questions',
             args: {
-                search:     self.search,
+                search: self.search,
                 categories: Object.keys(self.cats).join(','),
-                types:      Object.keys(self.types).join(','),
+                types: Object.keys(self.types).join(','),
                 difficulty: '',
-                tags:       Object.keys(self.diffs).concat(self.tags).join(','),
-                scope:      self.config.searchscope || 'all',
-                contextid:  self.config.contextid   || 1,
-                limit:      200,
+                tags: Object.keys(self.diffs).concat(self.tags).join(','),
+                scope: self.config.searchscope || 'all',
+                contextid: self.config.contextid || 1,
+                limit: 200,
             },
             done: function(result) {
-                if (spinner) spinner.classList.add('d-none');
+                if (spinner) {
+                    spinner.classList.add('d-none');
+                }
                 self.results = result.questions || [];
                 var valid = {};
-                self.results.forEach(function(q) { valid[q.id] = true; });
+                self.results.forEach(function(q) {
+                    valid[q.id] = true;
+                });
                 Object.keys(self.selected).forEach(function(id) {
-                    if (!valid[id]) delete self.selected[id];
+                    if (!valid[id]) {
+                        delete self.selected[id];
+                    }
                 });
                 self.renderResults();
                 self.updateFooter();
             },
             fail: function(err) {
-                if (spinner) spinner.classList.add('d-none');
+                if (spinner) {
+                    spinner.classList.add('d-none');
+                }
                 var list = self.el('results');
-                if (list) list.innerHTML = '<div class="alert alert-warning small p-2">'
-                    + (err.message || 'Suche fehlgeschlagen') + '</div>';
+                if (list) {
+                    list.innerHTML = '<div class="alert alert-warning small p-2">'
+                        + (err.message || 'Suche fehlgeschlagen') + '</div>';
+                }
             },
         }]);
     };
 
-    // ---------------------------------------------------------------
     // Ergebnisliste
-    // ---------------------------------------------------------------
     BlockState.prototype.renderResults = function() {
-        var self  = this;
-        var wrap  = self.el('results');
+        var self = this;
+        var wrap = self.el('results');
         var count = self.el('count');
-        if (!wrap) return;
-        if (count) count.textContent = self.results.length
-            + ' Frage' + (self.results.length !== 1 ? 'n' : '') + ' gefunden';
+        if (!wrap) {
+            return;
+        }
+        if (count) {
+            count.textContent = self.results.length
+                + ' Frage' + (self.results.length !== 1 ? 'n' : '') + ' gefunden';
+        }
         if (!self.results.length) {
             wrap.innerHTML = '<div class="text-center text-muted small py-3">Keine Treffer.</div>';
             return;
         }
         var html = '';
         self.results.forEach(function(q) {
-            var sel     = !!self.selected[q.id];
+            var sel = !!self.selected[q.id];
             // Anzeigenamen aus dynamisch geladenen Typen auflösen
             var typeLbl = QTYPE_FALLBACK[q.qtype] || q.qtype;
             self.loadedQtypes.forEach(function(t) {
-                if (t.key === q.qtype) typeLbl = t.label;
+                if (t.key === q.qtype) {
+                    typeLbl = t.label;
+                }
             });
             var typeCol = TYPE_COLOR[q.qtype] || 'bg-secondary bg-opacity-10 text-secondary';
-            var tagPills= (q.tags || []).map(function(t) {
+            var tagPills = (q.tags || []).map(function(t) {
                 return '<span class="badge bg-primary bg-opacity-10 text-primary" style="font-size:10px">#'
                      + escHtml(t.name) + '</span>';
             }).join(' ');
@@ -524,7 +611,9 @@ define(['core/ajax'], function(Ajax) {
         wrap.innerHTML = html;
         wrap.querySelectorAll('.qf-item').forEach(function(item) {
             item.addEventListener('click', function(e) {
-                if (e.target.tagName === 'INPUT') return;
+                if (e.target.tagName === 'INPUT') {
+                    return;
+                }
                 self.toggleSelect(parseInt(this.dataset.qid, 10));
             });
         });
@@ -536,64 +625,100 @@ define(['core/ajax'], function(Ajax) {
     };
 
     BlockState.prototype.toggleSelect = function(id) {
-        if (this.selected[id]) delete this.selected[id]; else this.selected[id] = true;
-        this.renderResults(); this.updateFooter();
+        if (this.selected[id]) {
+            delete this.selected[id];
+        } else {
+            this.selected[id] = true;
+        }
+        this.renderResults();
+        this.updateFooter();
     };
     BlockState.prototype.toggleSelectAll = function() {
         var self = this;
-        if (Object.keys(self.selected).length === self.results.length) self.selected = {};
-        else self.results.forEach(function(q) { self.selected[q.id] = true; });
-        self.renderResults(); self.updateFooter();
+        if (Object.keys(self.selected).length === self.results.length) {
+            self.selected = {};
+        } else {
+            self.results.forEach(function(q) {
+                self.selected[q.id] = true;
+            });
+        }
+        self.renderResults();
+        self.updateFooter();
     };
     BlockState.prototype.updateFooter = function() {
-        var n    = Object.keys(this.selected).length;
+        var n = Object.keys(this.selected).length;
         var info = this.el('sel-info');
-        if (info) info.textContent = n === 0 ? 'Nichts ausgewählt'
-            : n + ' Frage' + (n !== 1 ? 'n' : '') + ' ausgewählt';
+        if (info) {
+            info.textContent = n === 0
+                ? 'Nichts ausgewählt'
+                : n + ' Frage' + (n !== 1 ? 'n' : '') + ' ausgewählt';
+        }
         this.block().querySelectorAll('.qf-export,.qf-add-to-quiz').forEach(function(b) {
             b.disabled = (n === 0);
         });
     };
 
-    // ---------------------------------------------------------------
     // Export / Zum Test
-    // ---------------------------------------------------------------
     BlockState.prototype.doExport = function(format) {
         var self = this;
-        var ids  = Object.keys(self.selected).join(',');
-        if (!ids) return;
+        var ids = Object.keys(self.selected).join(',');
+        if (!ids) {
+            return;
+        }
         Ajax.call([{
             methodname: 'block_questionfilter_export_questions',
-            args: { questionids: ids, format: format, contextid: self.config.contextid || 1 },
+            args: {questionids: ids, format: format, contextid: self.config.contextid || 1},
             done: function(result) {
                 if (result.success && result.url) {
                     var a = document.createElement('a');
-                    a.href = result.url; a.download = result.filename;
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    a.href = result.url;
+                    a.download = result.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
                 }
             },
-            fail: function(err) { alert('Export fehlgeschlagen: ' + (err.message || '')); },
+            fail: Notification.exception,
         }]);
     };
     BlockState.prototype.addToQuiz = function() {
         var ids = Object.keys(this.selected);
-        if (!ids.length) return;
+        if (!ids.length) {
+            return;
+        }
         window.location.href = M.cfg.wwwroot
             + '/question/bank/managecategories/index.php?courseid=1&qids=' + ids.join(',');
     };
 
+    /**
+     * Maskiert HTML-Sonderzeichen fuer die sichere Ausgabe.
+     *
+     * @param {String} s Zu maskierender Text.
+     * @return {String} Maskierter Text.
+     */
     function escHtml(s) {
-        if (s == null) return '';
-        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
-            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        if (s === null || s === undefined) {
+            return '';
+        }
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     return {
+        /**
+         * Initialisiert eine Blockinstanz.
+         *
+         * @param {Object} config Konfiguration aus PHP.
+         */
         init: function(config) {
             var state = new BlockState(config.blockid, config);
             if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', function() { state.init(); });
-            } else { state.init(); }
+                document.addEventListener('DOMContentLoaded', function() {
+                    state.init();
+                });
+            } else {
+                state.init();
+            }
         },
     };
 });

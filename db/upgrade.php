@@ -1,28 +1,51 @@
 <?php
 // This file is part of Moodle - https://moodle.org/
-// Copyright: 2026 Moodle in Niedersachsen e. V.
-// License:   https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-defined('MOODLE_INTERNAL') || die();
+/**
+ * Upgrade-Schritte des Plugins block_questionfilter.
+ *
+ * @package    block_questionfilter
+ * @copyright  2026 Moodle in Niedersachsen e. V.
+ * @author     Moodle in Niedersachsen e. V.
+ * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
+/**
+ * Fuehrt die Upgrade-Schritte des Plugins aus.
+ *
+ * @param int $oldversion Bisher installierte Version.
+ * @return bool Immer true.
+ */
 function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
-    // Migration: Falls alte Keys aus früheren Versionen noch existieren,
-    // Werte auf den aktuellen Key übertragen und alten Key löschen.
+    // Werte alter Konfigurationsschluessel auf den aktuellen Schluessel uebertragen.
     $migrations = [
-        'nivelevel_levels'  => 'difficulty_levels',   // v2026062205 → v2026062206 Umbenennung rückgängig
-        'nivelevel_values'  => 'difficulty_levels',   // alternative Schreibweise
+        'nivelevel_levels' => 'difficulty_levels',
+        'nivelevel_values' => 'difficulty_levels',
     ];
 
-    foreach ($migrations as $oldKey => $newKey) {
-        $oldVal = get_config('block_questionfilter', $oldKey);
-        if ($oldVal !== false) {
-            // Nur übertragen wenn der neue Key noch den Standard-Wert hat
-            $newVal = get_config('block_questionfilter', $newKey);
+    foreach ($migrations as $oldkey => $newkey) {
+        $oldval = get_config('block_questionfilter', $oldkey);
+        if ($oldval !== false) {
+            // Nur uebertragen, wenn der neue Schluessel noch den Standardwert hat.
+            $newval = get_config('block_questionfilter', $newkey);
             $default = "Leicht\nMittel\nSchwer";
-            if ($newVal === false || trim($newVal) === trim($default)) {
-                set_config($newKey, $oldVal, 'block_questionfilter');
+            if ($newval === false || trim($newval) === trim($default)) {
+                set_config($newkey, $oldval, 'block_questionfilter');
             }
-            unset_config($oldKey, 'block_questionfilter');
+            unset_config($oldkey, 'block_questionfilter');
         }
     }
 
