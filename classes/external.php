@@ -892,4 +892,277 @@ class block_questionfilter_external extends external_api {
         }
         return $out;
     }
+
+    // ---------------------------------------------------------------
+    // rate_question — Sternebewertung speichern (angemeldete + Gaeste)
+    // ---------------------------------------------------------------
+
+    /**
+     * Parameter fuer rate_question.
+     */
+    public static function rate_question_parameters(): external_function_parameters {
+        return new external_function_parameters([
+            'questionid'  => new external_value(PARAM_INT,          'Fragen-ID'),
+            'rating'      => new external_value(PARAM_INT,          'Bewertung 1-5'),
+            'sessionhash' => new external_value(PARAM_ALPHANUMEXT,  'Session-Hash fuer Gaeste', VALUE_DEFAULT, ''),
+            'contextid'   => new external_value(PARAM_INT,          'Kontext', VALUE_DEFAULT, 1),
+        ]);
+    }
+
+    /**
+     * Sternebewertung einer Frage speichern.
+     *
+     * Angemeldete Nutzer werden per userid identifiziert,
+     * Gaeste ueber einen clientseitigen Session-Hash.
+     * Jeder Nutzer/Gast kann pro Frage eine Bewertung abgeben
+     * und sie nachtraeglich aendern.
+     *
+     * @param int    $questionid  Fragen-ID.
+     * @param int    $rating      Bewertung 1-5.
+     * @param string $sessionhash Session-Hash fuer Gaeste.
+     * @param int    $contextid   Aktueller Kontext.
+     * @return array Aktueller Durchschnitt, Anzahl und eigene Bewertung.
+     */
+    public static function rate_question(
+        int $questionid,
+        int $rating,
+        string $sessionhash,
+        int $contextid
+    ): array {
+        global $DB, $USER;
+
+        $params = self::validate_parameters(self::rate_question_parameters(), [
+            'questionid'  => $questionid,
+            'rating'      => $rating,
+            'sessionhash' => $sessionhash,
+            'contextid'   => $contextid,
+        ]);
+
+        $context = context::instance_by_id($params['contextid']);
+        self::validate_context($context);
+
+        if (!has_capability('block/questionfilter:view', context_system::instance())) {
+            throw new moodle_exception('nopermission', 'block_questionfilter');
+        }
+
+        $r   = max(1, min(5, (int)$params['rating']));
+        $qid = (int)$params['questionid'];
+
+        if (!$DB->record_exists('question', ['id' => $qid])) {
+            throw new moodle_exception('invalidquestion', 'block_questionfilter');
+        }
+
+        $now     = time();
+        $isguest = isguestuser() || !isloggedin();
+
+        if ($isguest) {
+            $hash = clean_param($params['sessionhash'], PARAM_ALPHANUMEXT);
+            if (empty($hash)) {
+                throw new moodle_exception('nosessionhash', 'block_questionfilter');
+            }
+            $existing = $DB->get_record('block_questionfilter_ratings',
+                ['questionid' => $qid, 'sessionhash' => $hash, 'userid' => null]);
+            if ($existing) {
+                $existing->rating      = $r;
+                $existing->timemodified = $now;
+                $DB->update_record('block_questionfilter_ratings', $existing);
+            } else {
+                $DB->insert_record('block_questionfilter_ratings', (object)[
+                    'questionid'   => $qid,
+                    'userid'       => null,
+                    'sessionhash'  => $hash,
+                    'rating'       => $r,
+                    'timecreated'  => $now,
+                    'timemodified' => $now,
+                ]);
+            }
+        } else {
+            $existing = $DB->get_record('block_questionfilter_ratings',
+                ['questionid' => $qid, 'userid' => (int)$USER->id]);
+            if ($existing) {
+                $existing->rating      = $r;
+                $existing->timemodified = $now;
+                $DB->update_record('block_questionfilter_ratings', $existing);
+            } else {
+                $DB->insert_record('block_questionfilter_ratings', (object)[
+                    'questionid'   => $qid,
+                    'userid'       => (int)$USER->id,
+                    'sessionhash'  => null,
+                    'rating'       => $r,
+                    'timecreated'  => $now,
+                    'timemodified' => $now,
+                ]);
+            }
+        }
+
+        return self::compute_rating(
+            $qid,
+            $isguest ? null : (int)$USER->id,
+            $isguest ? $params['sessionhash'] : ''
+        );
+    }
+
+    /**
+     * Rueckgabestruktur fuer rate_question.
+     */
+    public static function rate_question_returns(): external_single_structure {
+        return new external_single_structure([
+            'average'  => new external_value(PARAM_FLOAT, 'Durchschnitt'),
+            'count'    => new external_value(PARAM_INT,   'Anzahl Bewertungen'),
+            'myrating' => new external_value(PARAM_INT,   'Eigene Bewertung (0 = keine)'),
+        ]);
+    }
+
+    // ---------------------------------------------------------------
+    // get_ratings — Durchschnitte fuer eine Liste von Fragen laden
+    // ---------------------------------------------------------------
+
+    /**
+     * Parameter fuer get_ratings.
+     */
+    public static function get_ratings_parameters(): external_function_parameters {
+        return new external_function_parameters([
+            'questionids' => new external_value(PARAM_TEXT,         'Kommagetrennte Fragen-IDs'),
+            'sessionhash' => new external_value(PARAM_ALPHANUMEXT,  'Session-Hash fuer Gaeste', VALUE_DEFAULT, ''),
+            'contextid'   => new external_value(PARAM_INT,          'Kontext', VALUE_DEFAULT, 1),
+        ]);
+    }
+
+    /**
+     * Bewertungsdaten fuer mehrere Fragen laden.
+     *
+     * @param string $questionids Kommagetrennte Fragen-IDs.
+     * @param string $sessionhash Session-Hash fuer Gaeste.
+     * @param int    $contextid   Aktueller Kontext.
+     * @return array Liste mit Durchschnitt, Anzahl und eigener Bewertung je Frage.
+     */
+    public static function get_ratings(
+        string $questionids,
+        string $sessionhash,
+        int $contextid
+    ): array {
+        global $DB, $USER;
+
+        $params = self::validate_parameters(self::get_ratings_parameters(), [
+            'questionids' => $questionids,
+            'sessionhash' => $sessionhash,
+            'contextid'   => $contextid,
+        ]);
+
+        $context = context::instance_by_id($params['contextid']);
+        self::validate_context($context);
+
+        if (!has_capability('block/questionfilter:view', context_system::instance())) {
+            throw new moodle_exception('nopermission', 'block_questionfilter');
+        }
+
+        $ids = array_filter(array_map('intval', explode(',', $params['questionids'])));
+        if (empty($ids)) {
+            return ['ratings' => []];
+        }
+
+        $isguest = isguestuser() || !isloggedin();
+        $userid  = $isguest ? null : (int)$USER->id;
+        $hash    = clean_param($params['sessionhash'], PARAM_ALPHANUMEXT);
+
+        list($insql, $args) = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'qid');
+
+        // Durchschnitt und Anzahl je Frage.
+        $avgs = $DB->get_records_sql(
+            "SELECT questionid,
+                    AVG(rating) AS average,
+                    COUNT(*)    AS cnt
+               FROM {block_questionfilter_ratings}
+              WHERE questionid $insql
+           GROUP BY questionid",
+            $args
+        );
+
+        // Eigene Bewertung des aktuellen Nutzers oder Gastes.
+        $myratings = [];
+        if ($userid) {
+            $rows = $DB->get_records_sql(
+                "SELECT questionid, rating
+                   FROM {block_questionfilter_ratings}
+                  WHERE questionid $insql
+                    AND userid = :uid",
+                array_merge($args, ['uid' => $userid])
+            );
+            foreach ($rows as $row) {
+                $myratings[(int)$row->questionid] = (int)$row->rating;
+            }
+        } elseif ($hash) {
+            $rows = $DB->get_records_sql(
+                "SELECT questionid, rating
+                   FROM {block_questionfilter_ratings}
+                  WHERE questionid $insql
+                    AND sessionhash = :hash
+                    AND userid IS NULL",
+                array_merge($args, ['hash' => $hash])
+            );
+            foreach ($rows as $row) {
+                $myratings[(int)$row->questionid] = (int)$row->rating;
+            }
+        }
+
+        $result = [];
+        foreach ($ids as $qid) {
+            $result[] = [
+                'questionid' => $qid,
+                'average'    => isset($avgs[$qid]) ? round((float)$avgs[$qid]->average, 1) : 0.0,
+                'count'      => isset($avgs[$qid]) ? (int)$avgs[$qid]->cnt : 0,
+                'myrating'   => $myratings[$qid] ?? 0,
+            ];
+        }
+        return ['ratings' => $result];
+    }
+
+    /**
+     * Rueckgabestruktur fuer get_ratings.
+     */
+    public static function get_ratings_returns(): external_single_structure {
+        return new external_single_structure([
+            'ratings' => new external_multiple_structure(
+                new external_single_structure([
+                    'questionid' => new external_value(PARAM_INT),
+                    'average'    => new external_value(PARAM_FLOAT),
+                    'count'      => new external_value(PARAM_INT),
+                    'myrating'   => new external_value(PARAM_INT),
+                ])
+            ),
+        ]);
+    }
+
+    /**
+     * Hilfsmethode: Durchschnitt und eigene Bewertung fuer eine Frage berechnen.
+     *
+     * @param int      $qid    Fragen-ID.
+     * @param int|null $userid Nutzer-ID oder null bei Gaesten.
+     * @param string   $hash   Session-Hash fuer Gaeste.
+     * @return array Durchschnitt, Anzahl, eigene Bewertung.
+     */
+    private static function compute_rating(int $qid, ?int $userid, string $hash): array {
+        global $DB;
+
+        $avg  = (float)$DB->get_field_sql(
+            "SELECT AVG(rating) FROM {block_questionfilter_ratings} WHERE questionid = :qid",
+            ['qid' => $qid]
+        );
+        $cnt  = $DB->count_records('block_questionfilter_ratings', ['questionid' => $qid]);
+        $mine = 0;
+
+        if ($userid) {
+            $mine = (int)($DB->get_field('block_questionfilter_ratings', 'rating',
+                ['questionid' => $qid, 'userid' => $userid]) ?: 0);
+        } elseif ($hash) {
+            $mine = (int)($DB->get_field('block_questionfilter_ratings', 'rating',
+                ['questionid' => $qid, 'sessionhash' => $hash, 'userid' => null]) ?: 0);
+        }
+
+        return [
+            'average'  => round($avg, 1),
+            'count'    => (int)$cnt,
+            'myrating' => $mine,
+        ];
+    }
 }

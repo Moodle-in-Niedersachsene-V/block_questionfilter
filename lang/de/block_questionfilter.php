@@ -77,3 +77,7 @@ $string['settings_searchscope_heading'] = 'Suchbereich';
 $string['settings_searchscope_help'] = 'Alle: system- und kursübergreifend. Kurs: nur der aktuelle Kurs. System: nur die systemweite Fragebank.';
 $string['tagplaceholder'] = 'Tag eingeben und Enter …';
 $string['tags'] = 'Tags';
+
+// Bewertung
+$string['invalidquestion'] = 'Frage nicht gefunden.';
+$string['nosessionhash']   = 'Kein Session-Hash fuer Gast-Bewertung uebermittelt.';

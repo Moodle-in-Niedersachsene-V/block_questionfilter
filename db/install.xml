@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="blocks/questionfilter/db" VERSION="20260805" COMMENT="Fragebank-Filter Block Datenbank"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd">
+  <TABLES>
+    <TABLE NAME="block_questionfilter_ratings" COMMENT="Sternebewertungen fuer Fragen (1-5 Sterne, systemweit)">
+      <FIELDS>
+        <FIELD NAME="id"           TYPE="int"  LENGTH="10" NOTNULL="true"  SEQUENCE="true"/>
+        <FIELD NAME="questionid"   TYPE="int"  LENGTH="10" NOTNULL="true"  COMMENT="ID der bewerteten Frage"/>
+        <FIELD NAME="userid"       TYPE="int"  LENGTH="10" NOTNULL="false" COMMENT="NULL = Gast-Bewertung"/>
+        <FIELD NAME="sessionhash"  TYPE="char" LENGTH="64" NOTNULL="false" COMMENT="SHA256-aehnlicher Hash fuer Gaeste"/>
+        <FIELD NAME="rating"       TYPE="int"  LENGTH="1"  NOTNULL="true"  COMMENT="Bewertung 1-5"/>
+        <FIELD NAME="timecreated"  TYPE="int"  LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="timemodified" TYPE="int"  LENGTH="10" NOTNULL="true"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary"    TYPE="primary" FIELDS="id"/>
+        <KEY NAME="fk_question" TYPE="foreign" FIELDS="questionid" REFTABLE="question" REFFIELDS="id"/>
+        <KEY NAME="fk_user"     TYPE="foreign" FIELDS="userid"     REFTABLE="user"     REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="idx_userid_question"  UNIQUE="false" FIELDS="userid,questionid"/>
+        <INDEX NAME="idx_session_question" UNIQUE="false" FIELDS="sessionhash,questionid"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>

@@ -43,6 +43,8 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         this.panelOpen = false;
         this.panelQuery = '';
         this.debounce = null;
+        this.ratings = {};      // {qid: {average, count, myrating}}
+        this.sessionHash = getSessionHash();
     }
 
     BlockState.prototype.el = function(id) {
@@ -196,6 +198,28 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
                 self.addToQuiz();
             });
         }
+
+        // Vorschau-Modal schliessen
+        var modalClose = self.el('modal-close');
+        if (modalClose) {
+            modalClose.addEventListener('click', function() {
+                self.closePreview();
+            });
+        }
+        var modalBg = self.el('modal-bg');
+        if (modalBg) {
+            modalBg.addEventListener('click', function(e) {
+                if (e.target === modalBg) {
+                    self.closePreview();
+                }
+            });
+        }
+        // ESC-Taste schliesst Modal
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                self.closePreview();
+            }
+        });
 
         self.loadCategories();
     };
@@ -549,6 +573,10 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
                 });
                 self.renderResults();
                 self.updateFooter();
+                // Bewertungen nachladen
+                if (self.results.length) {
+                    self.loadRatings(self.results.map(function(q) { return q.id; }));
+                }
             },
             fail: function(err) {
                 if (spinner) {
@@ -582,7 +610,6 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         var html = '';
         self.results.forEach(function(q) {
             var sel = !!self.selected[q.id];
-            // Anzeigenamen aus dynamisch geladenen Typen auflösen
             var typeLbl = QTYPE_FALLBACK[q.qtype] || q.qtype;
             self.loadedQtypes.forEach(function(t) {
                 if (t.key === q.qtype) {
@@ -594,24 +621,44 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
                 return '<span class="badge bg-primary bg-opacity-10 text-primary" style="font-size:10px">#'
                      + escHtml(t.name) + '</span>';
             }).join(' ');
-            html += '<div class="qf-item p-1 mb-1 rounded d-flex gap-2 align-items-start'
+            var stars = self.renderStars(q.id);
+
+            html += '<div class="qf-item p-1 mb-1 rounded'
                  + (sel ? ' qf-item-sel bg-info bg-opacity-10 border border-info' : '')
-                 + '" data-qid="' + q.id + '" style="cursor:pointer">'
+                 + '" data-qid="' + q.id + '">'
+                 + '<div class="d-flex gap-2 align-items-start">'
                  + '<input type="checkbox" class="form-check-input mt-1 flex-shrink-0 qf-chk"'
                  + (sel ? ' checked' : '') + ' data-qid="' + q.id + '">'
                  + '<div style="min-width:0;flex:1">'
-                 + '<div class="small fw-semibold text-truncate" title="' + escHtml(q.name) + '">'
-                 + escHtml(q.name) + '</div>'
-                 + '<div class="d-flex flex-wrap gap-1 mt-1">'
+                 // Titelzeile mit Vorschau-Button — Button immer sichtbar
+                 + '<div class="d-flex align-items-center gap-1 mb-1">'
+                 + '<span class="small fw-semibold text-truncate" style="flex:1" '
+                 + 'title="' + escHtml(q.name) + '">' + escHtml(q.name) + '</span>'
+                 + '<button class="btn btn-sm qf-preview-btn flex-shrink-0" '
+                 + 'data-qid="' + q.id + '" data-qname="' + escHtml(q.name) + '" '
+                 + 'title="Vorschau anzeigen" '
+                 + 'style="font-size:11px;color:#fff;background:#6b7280;border:none;'
+                 + 'border-radius:4px;padding:1px 7px;line-height:1.6">'
+                 + '<i class="fa fa-eye"></i> Vorschau</button>'
+                 + '</div>'
+                 // Typ-Badges
+                 + '<div class="d-flex flex-wrap gap-1 mb-1">'
                  + '<span class="badge ' + typeCol + '" style="font-size:10px">' + typeLbl + '</span>'
                  + '<span class="badge bg-light text-muted" style="font-size:10px">'
                  + escHtml(q.categoryname) + '</span>'
-                 + tagPills + '</div></div></div>';
+                 + tagPills + '</div>'
+                 // Sternebewertung
+                 + '<div>' + stars + '</div>'
+                 + '</div></div></div>';
         });
         wrap.innerHTML = html;
+
+        // Klick auf Zeile → Checkbox (nicht wenn Vorschau oder Stern geklickt)
         wrap.querySelectorAll('.qf-item').forEach(function(item) {
             item.addEventListener('click', function(e) {
-                if (e.target.tagName === 'INPUT') {
+                if (e.target.tagName === 'INPUT'
+                    || e.target.closest('.qf-preview-btn')
+                    || e.target.closest('.qf-stars')) {
                     return;
                 }
                 self.toggleSelect(parseInt(this.dataset.qid, 10));
@@ -620,6 +667,47 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         wrap.querySelectorAll('.qf-chk').forEach(function(chk) {
             chk.addEventListener('change', function() {
                 self.toggleSelect(parseInt(this.dataset.qid, 10));
+            });
+        });
+
+        // Klick auf Vorschau-Button → Modal öffnen
+        wrap.querySelectorAll('.qf-preview-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                self.openPreview(parseInt(this.dataset.qid, 10), this.dataset.qname);
+            });
+        });
+
+        // Stern-Hover und Klick
+        wrap.querySelectorAll('.qf-star').forEach(function(star) {
+            star.addEventListener('mouseenter', function() {
+                var qid = parseInt(this.dataset.qid, 10);
+                var n   = parseInt(this.dataset.star, 10);
+                var container = this.closest('.qf-stars');
+                if (container) {
+                    container.querySelectorAll('.qf-star').forEach(function(s) {
+                        s.style.color = parseInt(s.dataset.star, 10) <= n ? '#f59e0b' : '#e5e7eb';
+                    });
+                }
+            });
+            star.addEventListener('mouseleave', function() {
+                var qid = parseInt(this.dataset.qid, 10);
+                var r   = self.ratings[qid] || {average: 0, myrating: 0};
+                var ref = r.myrating > 0 ? r.myrating : Math.round(r.average);
+                var container = this.closest('.qf-stars');
+                if (container) {
+                    container.querySelectorAll('.qf-star').forEach(function(s) {
+                        var i = parseInt(s.dataset.star, 10);
+                        s.style.color = i <= ref
+                            ? (r.myrating > 0 ? '#f59e0b' : '#9ca3af')
+                            : '#e5e7eb';
+                    });
+                }
+            });
+            star.addEventListener('click', function(e) {
+                e.stopPropagation();
+                self.rateQuestion(parseInt(this.dataset.qid, 10), parseInt(this.dataset.star, 10));
             });
         });
     };
@@ -688,6 +776,170 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         }
         window.location.href = M.cfg.wwwroot
             + '/question/bank/managecategories/index.php?courseid=1&qids=' + ids.join(',');
+    };
+
+    /**
+     * Session-Hash fuer Gast-Bewertungen — einmalig pro Sitzung erzeugen.
+     *
+     * @return {String} 64-stelliger Hex-String.
+     */
+    function getSessionHash() {
+        var key = 'qf_session_hash';
+        var h = '';
+        try { h = sessionStorage.getItem(key) || ''; } catch (e) { /* Private-Modus */ }
+        if (!h) {
+            var chars = 'abcdef0123456789';
+            for (var i = 0; i < 64; i++) {
+                h += chars[Math.floor(Math.random() * chars.length)];
+            }
+            try { sessionStorage.setItem(key, h); } catch (e) { /* ignore */ }
+        }
+        return h;
+    }
+
+    // ---------------------------------------------------------------
+    // Vorschau-Modal
+    // ---------------------------------------------------------------
+
+    /**
+     * Oeffnet das Vorschau-Modal fuer eine Frage.
+     *
+     * @param {Number} qid   Fragen-ID.
+     * @param {String} qname Fragenname fuer den Modal-Titel.
+     */
+    BlockState.prototype.openPreview = function(qid, qname) {
+        var self    = this;
+        var modalBg = self.el('modal-bg');
+        var iframe  = self.el('preview-iframe');
+        var title   = self.el('modal-title');
+        var spinner = self.el('modal-spinner');
+        if (!modalBg || !iframe) {
+            return;
+        }
+        if (title) {
+            title.textContent = qname;
+        }
+        if (spinner) {
+            spinner.style.display = '';
+        }
+        iframe.style.display = 'none';
+        iframe.src = '';
+        modalBg.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+
+        var url = (self.config.wwwroot || M.cfg.wwwroot)
+            + '/question/bank/previewquestion/preview.php?id=' + qid;
+        iframe.src = url;
+        iframe.onload = function() {
+            if (spinner) {
+                spinner.style.display = 'none';
+            }
+            iframe.style.display = '';
+        };
+    };
+
+    /**
+     * Schliesst das Vorschau-Modal.
+     */
+    BlockState.prototype.closePreview = function() {
+        var modalBg = this.el('modal-bg');
+        var iframe  = this.el('preview-iframe');
+        if (modalBg) {
+            modalBg.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+        if (iframe) {
+            iframe.src = '';
+        }
+    };
+
+    // ---------------------------------------------------------------
+    // Sternebewertung
+    // ---------------------------------------------------------------
+
+    /**
+     * Laedt Bewertungen fuer alle sichtbaren Fragen.
+     *
+     * @param {Array} qids Liste von Fragen-IDs.
+     */
+    BlockState.prototype.loadRatings = function(qids) {
+        var self = this;
+        if (!qids.length) {
+            return;
+        }
+        Ajax.call([{
+            methodname: 'block_questionfilter_get_ratings',
+            args: {
+                questionids: qids.join(','),
+                sessionhash: self.sessionHash,
+                contextid:   self.config.contextid || 1,
+            },
+            done: function(result) {
+                (result.ratings || []).forEach(function(r) {
+                    self.ratings[r.questionid] = r;
+                });
+                self.renderResults();
+            },
+            fail: function() { /* Bewertungen sind optional */ },
+        }]);
+    };
+
+    /**
+     * Speichert eine Sternebewertung fuer eine Frage.
+     *
+     * @param {Number} qid   Fragen-ID.
+     * @param {Number} stars Anzahl Sterne (1-5).
+     */
+    BlockState.prototype.rateQuestion = function(qid, stars) {
+        var self = this;
+        Ajax.call([{
+            methodname: 'block_questionfilter_rate_question',
+            args: {
+                questionid:  qid,
+                rating:      stars,
+                sessionhash: self.sessionHash,
+                contextid:   self.config.contextid || 1,
+            },
+            done: function(result) {
+                self.ratings[qid] = result;
+                self.renderResults();
+            },
+            fail: function() { /* Stille Fehlerbehandlung */ },
+        }]);
+    };
+
+    /**
+     * Gibt das HTML fuer die Sternebewertung einer Frage zurueck.
+     *
+     * Eigene Bewertung: gelbe Sterne.
+     * Nur Durchschnitt: graue Sterne.
+     *
+     * @param {Number} qid Fragen-ID.
+     * @return {String} HTML-String.
+     */
+    BlockState.prototype.renderStars = function(qid) {
+        var r     = this.ratings[qid] || {average: 0, count: 0, myrating: 0};
+        var avg   = r.average   || 0;
+        var mine  = r.myrating  || 0;
+        var count = r.count     || 0;
+        var stars = '';
+
+        for (var i = 1; i <= 5; i++) {
+            var active = mine > 0 ? (i <= mine) : (i <= Math.round(avg));
+            var color  = mine > 0
+                ? (i <= mine    ? '#f59e0b' : '#e5e7eb')
+                : (i <= Math.round(avg) ? '#9ca3af' : '#e5e7eb');
+            stars += '<span class="qf-star" data-qid="' + qid + '" data-star="' + i + '" '
+                   + 'style="cursor:pointer;font-size:16px;color:' + color + ';transition:color .1s" '
+                   + 'title="' + i + ' Stern' + (i > 1 ? 'e' : '') + '">&#9733;</span>';
+        }
+
+        var avgText = count > 0
+            ? '<span style="font-size:10px;color:#6b7280;margin-left:4px">'
+              + avg.toFixed(1) + ' (' + count + ')</span>'
+            : '<span style="font-size:10px;color:#9ca3af;margin-left:4px">Noch keine Bewertung</span>';
+
+        return '<span class="qf-stars" data-qid="' + qid + '">' + stars + avgText + '</span>';
     };
 
     /**

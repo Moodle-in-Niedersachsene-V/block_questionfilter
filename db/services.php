@@ -66,4 +66,24 @@ $functions = [
         'loginrequired' => true,
         'capabilities' => 'block/questionfilter:export',
     ],
+
+    'block_questionfilter_rate_question' => [
+        'classname'     => 'block_questionfilter_external',
+        'methodname'    => 'rate_question',
+        'description'   => 'Sternebewertung fuer eine Frage speichern',
+        'type'          => 'write',
+        'ajax'          => true,
+        'loginrequired' => false,
+        'capabilities'  => 'block/questionfilter:view',
+    ],
+
+    'block_questionfilter_get_ratings' => [
+        'classname'     => 'block_questionfilter_external',
+        'methodname'    => 'get_ratings',
+        'description'   => 'Bewertungen fuer eine Liste von Fragen laden',
+        'type'          => 'read',
+        'ajax'          => true,
+        'loginrequired' => false,
+        'capabilities'  => 'block/questionfilter:view',
+    ],
 ];

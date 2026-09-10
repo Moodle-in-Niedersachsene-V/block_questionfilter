@@ -30,23 +30,45 @@
  * @return bool Immer true.
  */
 function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
+    global $DB;
+    $dbman = $DB->get_manager();
+
     // Werte alter Konfigurationsschluessel auf den aktuellen Schluessel uebertragen.
     $migrations = [
         'nivelevel_levels' => 'difficulty_levels',
         'nivelevel_values' => 'difficulty_levels',
     ];
-
     foreach ($migrations as $oldkey => $newkey) {
         $oldval = get_config('block_questionfilter', $oldkey);
         if ($oldval !== false) {
-            // Nur uebertragen, wenn der neue Schluessel noch den Standardwert hat.
-            $newval = get_config('block_questionfilter', $newkey);
+            $newval  = get_config('block_questionfilter', $newkey);
             $default = "Leicht\nMittel\nSchwer";
             if ($newval === false || trim($newval) === trim($default)) {
                 set_config($newkey, $oldval, 'block_questionfilter');
             }
             unset_config($oldkey, 'block_questionfilter');
         }
+    }
+
+    // Build 2026080501: Bewertungstabelle anlegen.
+    if ($oldversion < 2026080501) {
+        $table = new xmldb_table('block_questionfilter_ratings');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id',           XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, XMLDB_SEQUENCE);
+            $table->add_field('questionid',   XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL);
+            $table->add_field('userid',       XMLDB_TYPE_INTEGER, '10', null);
+            $table->add_field('sessionhash',  XMLDB_TYPE_CHAR,    '64', null);
+            $table->add_field('rating',       XMLDB_TYPE_INTEGER, '1',  XMLDB_NOTNULL);
+            $table->add_field('timecreated',  XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL);
+            $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL);
+            $table->add_key('primary',             XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_key('fk_question',         XMLDB_KEY_FOREIGN, ['questionid'], 'question', ['id']);
+            $table->add_key('fk_user',             XMLDB_KEY_FOREIGN, ['userid'],     'user',     ['id']);
+            $table->add_index('idx_userid_question',   XMLDB_INDEX_NOTUNIQUE, ['userid', 'questionid']);
+            $table->add_index('idx_session_question',  XMLDB_INDEX_NOTUNIQUE, ['sessionhash', 'questionid']);
+            $dbman->create_table($table);
+        }
+        upgrade_block_savepoint(true, 2026080501, 'questionfilter');
     }
 
     return true;

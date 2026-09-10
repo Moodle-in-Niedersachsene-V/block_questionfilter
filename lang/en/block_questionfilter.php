@@ -77,3 +77,7 @@ $string['settings_searchscope_heading'] = 'Search scope';
 $string['settings_searchscope_help'] = 'All: system-wide and cross-course. Course: current course only. System: system question bank only.';
 $string['tagplaceholder'] = 'Enter tag and press Enter …';
 $string['tags'] = 'Tags';
+
+// Rating
+$string['invalidquestion'] = 'Question not found.';
+$string['nosessionhash']   = 'No session hash provided for guest rating.';

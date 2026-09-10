@@ -92,3 +92,14 @@
 .qf-block .qf-spinner {
     min-height: 32px;
 }
+
+/* ---- Sternebewertung ---- */
+.qf-star {
+    user-select: none;
+    display: inline-block;
+}
+.qf-stars {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+}
