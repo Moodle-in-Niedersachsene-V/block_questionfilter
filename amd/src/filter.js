@@ -851,7 +851,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
      */
     BlockState.prototype.closePreview = function() {
         var modalBg = this.el('modal-bg');
-        var iframe  = this.el('preview-iframe');
+        var iframe = this.el('preview-iframe');
         if (modalBg) {
             modalBg.style.display = 'none';
             document.body.style.overflow = '';
@@ -935,9 +935,10 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         var stars = '';
 
         for (var i = 1; i <= 5; i++) {
-            var color = mine > 0
-                ? (i <= mine ? '#f59e0b' : '#e5e7eb')
-                : (i <= Math.round(avg) ? '#9ca3af' : '#e5e7eb');
+            var colorFilled = mine > 0 ? '#f59e0b' : '#9ca3af';
+            var colorEmpty = '#e5e7eb';
+            var isFilled = mine > 0 ? i <= mine : i <= Math.round(avg);
+            var color = isFilled ? colorFilled : colorEmpty;
             stars += '<span class="qf-star" data-qid="' + qid + '" data-star="' + i + '" '
                    + 'style="cursor:pointer;font-size:16px;color:' + color + ';transition:color .1s" '
                    + 'title="' + i + ' Stern' + (i > 1 ? 'e' : '') + '">&#9733;</span>';
