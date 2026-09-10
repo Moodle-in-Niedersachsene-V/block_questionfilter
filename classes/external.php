@@ -959,8 +959,10 @@ class block_questionfilter_external extends external_api {
             if (empty($hash)) {
                 throw new moodle_exception('nosessionhash', 'block_questionfilter');
             }
-            $existing = $DB->get_record('block_questionfilter_ratings',
-                ['questionid' => $qid, 'sessionhash' => $hash, 'userid' => null]);
+            $existing = $DB->get_record(
+                'block_questionfilter_ratings',
+                ['questionid' => $qid, 'sessionhash' => $hash, 'userid' => null]
+            );
             if ($existing) {
                 $existing->rating      = $r;
                 $existing->timemodified = $now;
@@ -976,8 +978,10 @@ class block_questionfilter_external extends external_api {
                 ]);
             }
         } else {
-            $existing = $DB->get_record('block_questionfilter_ratings',
-                ['questionid' => $qid, 'userid' => (int)$USER->id]);
+            $existing = $DB->get_record(
+                'block_questionfilter_ratings',
+                ['questionid' => $qid, 'userid' => (int)$USER->id]
+            );
             if ($existing) {
                 $existing->rating      = $r;
                 $existing->timemodified = $now;

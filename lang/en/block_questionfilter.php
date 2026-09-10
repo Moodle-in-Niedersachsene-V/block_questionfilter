@@ -1,7 +1,26 @@
 <?php
 // This file is part of Moodle - https://moodle.org/
-// Copyright: 2026 Moodle in Niedersachsen e. V.
-// License:   https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * English language strings for block_questionfilter.
+ *
+ * @package    block_questionfilter
+ * @copyright  2026 Moodle in Niedersachsen e. V.
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -38,9 +57,9 @@ $string['scope_course'] = 'Current course only';
 $string['scope_system'] = 'System question bank only';
 $string['searchplaceholder'] = 'Search question or tag …';
 $string['selectall'] = 'Select all';
-$string['settings_customfields_heading'] = 'Custom tags';
 $string['settings_custom_tags'] = 'Suggested tags';
 $string['settings_custom_tags_help'] = 'Comma-separated list of tags offered as quick filters in the block.';
+$string['settings_customfields_heading'] = 'Custom tags';
 $string['settings_difficulty_desc'] = 'Levels are offered as tag filters. Extensible — one level per line.';
 $string['settings_difficulty_heading'] = 'Difficulty levels';
 $string['settings_difficulty_levels'] = 'Difficulty levels';
