@@ -43,7 +43,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         this.panelOpen = false;
         this.panelQuery = '';
         this.debounce = null;
-        this.ratings = {};      // {qid: {average, count, myrating}}
+        this.ratings = {}; // {qid: {average, count, myrating}}
         this.sessionHash = getSessionHash();
     }
 
@@ -573,9 +573,11 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
                 });
                 self.renderResults();
                 self.updateFooter();
-                // Bewertungen nachladen
+                // Bewertungen nachladen.
                 if (self.results.length) {
-                    self.loadRatings(self.results.map(function(q) { return q.id; }));
+                    self.loadRatings(self.results.map(function(q) {
+                        return q.id;
+                    }));
                 }
             },
             fail: function(err) {
@@ -679,11 +681,10 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
             });
         });
 
-        // Stern-Hover und Klick
+        // Stern-Hover und Klick.
         wrap.querySelectorAll('.qf-star').forEach(function(star) {
             star.addEventListener('mouseenter', function() {
-                var qid = parseInt(this.dataset.qid, 10);
-                var n   = parseInt(this.dataset.star, 10);
+                var n = parseInt(this.dataset.star, 10);
                 var container = this.closest('.qf-stars');
                 if (container) {
                     container.querySelectorAll('.qf-star').forEach(function(s) {
@@ -693,15 +694,14 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
             });
             star.addEventListener('mouseleave', function() {
                 var qid = parseInt(this.dataset.qid, 10);
-                var r   = self.ratings[qid] || {average: 0, myrating: 0};
+                var r = self.ratings[qid] || {average: 0, myrating: 0};
                 var ref = r.myrating > 0 ? r.myrating : Math.round(r.average);
                 var container = this.closest('.qf-stars');
                 if (container) {
                     container.querySelectorAll('.qf-star').forEach(function(s) {
                         var i = parseInt(s.dataset.star, 10);
-                        s.style.color = i <= ref
-                            ? (r.myrating > 0 ? '#f59e0b' : '#9ca3af')
-                            : '#e5e7eb';
+                        var activeColor = r.myrating > 0 ? '#f59e0b' : '#9ca3af';
+                        s.style.color = i <= ref ? activeColor : '#e5e7eb';
                     });
                 }
             });
@@ -786,13 +786,21 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
     function getSessionHash() {
         var key = 'qf_session_hash';
         var h = '';
-        try { h = sessionStorage.getItem(key) || ''; } catch (e) { /* Private-Modus */ }
+        try {
+            h = sessionStorage.getItem(key) || '';
+        } catch (e) {
+            // Private-Modus.
+        }
         if (!h) {
             var chars = 'abcdef0123456789';
             for (var i = 0; i < 64; i++) {
                 h += chars[Math.floor(Math.random() * chars.length)];
             }
-            try { sessionStorage.setItem(key, h); } catch (e) { /* ignore */ }
+            try {
+                sessionStorage.setItem(key, h);
+            } catch (e) {
+                // Ignore storage errors.
+            }
         }
         return h;
     }
@@ -808,10 +816,10 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
      * @param {String} qname Fragenname fuer den Modal-Titel.
      */
     BlockState.prototype.openPreview = function(qid, qname) {
-        var self    = this;
+        var self = this;
         var modalBg = self.el('modal-bg');
-        var iframe  = self.el('preview-iframe');
-        var title   = self.el('modal-title');
+        var iframe = self.el('preview-iframe');
+        var title = self.el('modal-title');
         var spinner = self.el('modal-spinner');
         if (!modalBg || !iframe) {
             return;
@@ -872,7 +880,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
             args: {
                 questionids: qids.join(','),
                 sessionhash: self.sessionHash,
-                contextid:   self.config.contextid || 1,
+                contextid: self.config.contextid || 1,
             },
             done: function(result) {
                 (result.ratings || []).forEach(function(r) {
@@ -898,13 +906,15 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
                 questionid:  qid,
                 rating:      stars,
                 sessionhash: self.sessionHash,
-                contextid:   self.config.contextid || 1,
+                contextid: self.config.contextid || 1,
             },
             done: function(result) {
                 self.ratings[qid] = result;
                 self.renderResults();
             },
-            fail: function() { /* Stille Fehlerbehandlung */ },
+            fail: function() {
+                // Silent error handling.
+            },
         }]);
     };
 
@@ -918,16 +928,15 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
      * @return {String} HTML-String.
      */
     BlockState.prototype.renderStars = function(qid) {
-        var r     = this.ratings[qid] || {average: 0, count: 0, myrating: 0};
-        var avg   = r.average   || 0;
-        var mine  = r.myrating  || 0;
-        var count = r.count     || 0;
+        var r = this.ratings[qid] || {average: 0, count: 0, myrating: 0};
+        var avg = r.average || 0;
+        var mine = r.myrating || 0;
+        var count = r.count || 0;
         var stars = '';
 
         for (var i = 1; i <= 5; i++) {
-            var active = mine > 0 ? (i <= mine) : (i <= Math.round(avg));
-            var color  = mine > 0
-                ? (i <= mine    ? '#f59e0b' : '#e5e7eb')
+            var color = mine > 0
+                ? (i <= mine ? '#f59e0b' : '#e5e7eb')
                 : (i <= Math.round(avg) ? '#9ca3af' : '#e5e7eb');
             stars += '<span class="qf-star" data-qid="' + qid + '" data-star="' + i + '" '
                    + 'style="cursor:pointer;font-size:16px;color:' + color + ';transition:color .1s" '

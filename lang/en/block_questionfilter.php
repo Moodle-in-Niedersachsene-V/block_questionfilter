@@ -72,12 +72,10 @@ $string['settings_questiontypes_source_help'] = 'All installed: shows all qtype 
 $string['settings_resultlimit'] = 'Max. results';
 $string['settings_resultlimit_help'] = 'Maximum number of questions returned per search request (default: 200).';
 $string['settings_searchscope'] = 'Search scope';
+$string['invalidquestion'] = 'Question not found.';
+$string['nosessionhash'] = 'No session hash provided for guest rating.';
 $string['settings_searchscope_desc'] = 'Defines which question collections the block searches across.';
 $string['settings_searchscope_heading'] = 'Search scope';
 $string['settings_searchscope_help'] = 'All: system-wide and cross-course. Course: current course only. System: system question bank only.';
 $string['tagplaceholder'] = 'Enter tag and press Enter …';
 $string['tags'] = 'Tags';
-
-// Rating
-$string['invalidquestion'] = 'Question not found.';
-$string['nosessionhash']   = 'No session hash provided for guest rating.';

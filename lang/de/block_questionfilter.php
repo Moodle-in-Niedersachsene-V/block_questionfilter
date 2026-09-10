@@ -72,12 +72,10 @@ $string['settings_questiontypes_source_help'] = 'Alle installierten: zeigt alle 
 $string['settings_resultlimit'] = 'Max. Ergebnisse';
 $string['settings_resultlimit_help'] = 'Maximale Anzahl Fragen, die pro Suchanfrage zurückgegeben werden (Standard: 200).';
 $string['settings_searchscope'] = 'Suchbereich';
+$string['invalidquestion'] = 'Frage nicht gefunden.';
+$string['nosessionhash'] = 'Kein Session-Hash fuer Gast-Bewertung uebermittelt.';
 $string['settings_searchscope_desc'] = 'Legt fest, über welche Fragesammlungen der Block sucht.';
 $string['settings_searchscope_heading'] = 'Suchbereich';
 $string['settings_searchscope_help'] = 'Alle: system- und kursübergreifend. Kurs: nur der aktuelle Kurs. System: nur die systemweite Fragebank.';
 $string['tagplaceholder'] = 'Tag eingeben und Enter …';
 $string['tags'] = 'Tags';
-
-// Bewertung
-$string['invalidquestion'] = 'Frage nicht gefunden.';
-$string['nosessionhash']   = 'Kein Session-Hash fuer Gast-Bewertung uebermittelt.';

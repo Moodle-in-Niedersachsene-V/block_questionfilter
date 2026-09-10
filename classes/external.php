@@ -894,18 +894,17 @@ class block_questionfilter_external extends external_api {
     }
 
     // ---------------------------------------------------------------
-    // rate_question — Sternebewertung speichern (angemeldete + Gaeste)
-    // ---------------------------------------------------------------
+    // Rate_question: Sternebewertung speichern (angemeldete + Gaeste).
 
     /**
      * Parameter fuer rate_question.
      */
     public static function rate_question_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'questionid'  => new external_value(PARAM_INT,          'Fragen-ID'),
-            'rating'      => new external_value(PARAM_INT,          'Bewertung 1-5'),
-            'sessionhash' => new external_value(PARAM_ALPHANUMEXT,  'Session-Hash fuer Gaeste', VALUE_DEFAULT, ''),
-            'contextid'   => new external_value(PARAM_INT,          'Kontext', VALUE_DEFAULT, 1),
+            'questionid'  => new external_value(PARAM_INT, 'Fragen-ID'),
+            'rating'      => new external_value(PARAM_INT, 'Bewertung 1-5'),
+            'sessionhash' => new external_value(PARAM_ALPHANUMEXT, 'Session-Hash fuer Gaeste', VALUE_DEFAULT, ''),
+            'contextid'   => new external_value(PARAM_INT, 'Kontext', VALUE_DEFAULT, 1),
         ]);
     }
 
@@ -960,8 +959,10 @@ class block_questionfilter_external extends external_api {
             if (empty($hash)) {
                 throw new moodle_exception('nosessionhash', 'block_questionfilter');
             }
-            $existing = $DB->get_record('block_questionfilter_ratings',
-                ['questionid' => $qid, 'sessionhash' => $hash, 'userid' => null]);
+            $existing = $DB->get_record(
+                'block_questionfilter_ratings',
+                ['questionid' => $qid, 'sessionhash' => $hash, 'userid' => null]
+            );
             if ($existing) {
                 $existing->rating      = $r;
                 $existing->timemodified = $now;
@@ -977,8 +978,10 @@ class block_questionfilter_external extends external_api {
                 ]);
             }
         } else {
-            $existing = $DB->get_record('block_questionfilter_ratings',
-                ['questionid' => $qid, 'userid' => (int)$USER->id]);
+            $existing = $DB->get_record(
+                'block_questionfilter_ratings',
+                ['questionid' => $qid, 'userid' => (int)$USER->id]
+            );
             if ($existing) {
                 $existing->rating      = $r;
                 $existing->timemodified = $now;
@@ -1008,23 +1011,22 @@ class block_questionfilter_external extends external_api {
     public static function rate_question_returns(): external_single_structure {
         return new external_single_structure([
             'average'  => new external_value(PARAM_FLOAT, 'Durchschnitt'),
-            'count'    => new external_value(PARAM_INT,   'Anzahl Bewertungen'),
-            'myrating' => new external_value(PARAM_INT,   'Eigene Bewertung (0 = keine)'),
+            'count'    => new external_value(PARAM_INT, 'Anzahl Bewertungen'),
+            'myrating' => new external_value(PARAM_INT, 'Eigene Bewertung (0 = keine)'),
         ]);
     }
 
     // ---------------------------------------------------------------
-    // get_ratings — Durchschnitte fuer eine Liste von Fragen laden
-    // ---------------------------------------------------------------
+    // Get_ratings: Durchschnitte fuer eine Liste von Fragen laden.
 
     /**
      * Parameter fuer get_ratings.
      */
     public static function get_ratings_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'questionids' => new external_value(PARAM_TEXT,         'Kommagetrennte Fragen-IDs'),
-            'sessionhash' => new external_value(PARAM_ALPHANUMEXT,  'Session-Hash fuer Gaeste', VALUE_DEFAULT, ''),
-            'contextid'   => new external_value(PARAM_INT,          'Kontext', VALUE_DEFAULT, 1),
+            'questionids' => new external_value(PARAM_TEXT, 'Kommagetrennte Fragen-IDs'),
+            'sessionhash' => new external_value(PARAM_ALPHANUMEXT, 'Session-Hash fuer Gaeste', VALUE_DEFAULT, ''),
+            'contextid'   => new external_value(PARAM_INT, 'Kontext', VALUE_DEFAULT, 1),
         ]);
     }
 
@@ -1065,7 +1067,7 @@ class block_questionfilter_external extends external_api {
         $userid  = $isguest ? null : (int)$USER->id;
         $hash    = clean_param($params['sessionhash'], PARAM_ALPHANUMEXT);
 
-        list($insql, $args) = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'qid');
+        [$insql, $args] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'qid');
 
         // Durchschnitt und Anzahl je Frage.
         $avgs = $DB->get_records_sql(
@@ -1091,7 +1093,7 @@ class block_questionfilter_external extends external_api {
             foreach ($rows as $row) {
                 $myratings[(int)$row->questionid] = (int)$row->rating;
             }
-        } elseif ($hash) {
+        } else if ($hash) {
             $rows = $DB->get_records_sql(
                 "SELECT questionid, rating
                    FROM {block_questionfilter_ratings}
@@ -1152,11 +1154,17 @@ class block_questionfilter_external extends external_api {
         $mine = 0;
 
         if ($userid) {
-            $mine = (int)($DB->get_field('block_questionfilter_ratings', 'rating',
-                ['questionid' => $qid, 'userid' => $userid]) ?: 0);
-        } elseif ($hash) {
-            $mine = (int)($DB->get_field('block_questionfilter_ratings', 'rating',
-                ['questionid' => $qid, 'sessionhash' => $hash, 'userid' => null]) ?: 0);
+            $mine = (int)($DB->get_field(
+                'block_questionfilter_ratings',
+                'rating',
+                ['questionid' => $qid, 'userid' => $userid]
+            ) ?: 0);
+        } else if ($hash) {
+            $mine = (int)($DB->get_field(
+                'block_questionfilter_ratings',
+                'rating',
+                ['questionid' => $qid, 'sessionhash' => $hash, 'userid' => null]
+            ) ?: 0);
         }
 
         return [

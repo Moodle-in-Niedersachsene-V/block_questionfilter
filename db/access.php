@@ -63,6 +63,9 @@ $capabilities = [
     ],
 
     'block/questionfilter:myaddinstance' => [
+        // Semgrep moodle-capability-ohne-riskbitmask: RISK_SPAM gesetzt,
+        // da das Hinzufuegen eines Blocks als UI-Aktion ohne Inhaltseinbringung gilt.
+        'riskbitmask' => RISK_SPAM,
         'captype' => 'write',
         'contextlevel' => CONTEXT_SYSTEM,
         'archetypes' => [
