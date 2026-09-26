@@ -1173,4 +1173,175 @@ class block_questionfilter_external extends external_api {
             'myrating' => $mine,
         ];
     }
+
+    // ---------------------------------------------------------------
+    // Get_question_preview: Fragetext und Antwortoptionen laden.
+
+    /**
+     * Parameter fuer get_question_preview.
+     */
+    public static function get_question_preview_parameters(): external_function_parameters {
+        return new external_function_parameters([
+            'questionid' => new external_value(PARAM_INT, 'Fragen-ID'),
+            'contextid'  => new external_value(PARAM_INT, 'Kontext', VALUE_DEFAULT, 1),
+        ]);
+    }
+
+    /**
+     * Laedt Fragetext und Antwortoptionen fuer die Vorschau.
+     *
+     * Gibt den Fragetext als bereinigtes HTML zurueck sowie
+     * Antwortoptionen bei Multiple-Choice-Fragen. Steht allen
+     * Nutzern mit block/questionfilter:view offen, auch Gaesten.
+     *
+     * @param int $questionid Fragen-ID.
+     * @param int $contextid  Aktueller Kontext.
+     * @return array Fragetext, Typ und Antwortoptionen.
+     */
+    public static function get_question_preview(int $questionid, int $contextid): array {
+        global $CFG, $DB;
+
+        $params = self::validate_parameters(self::get_question_preview_parameters(), [
+            'questionid' => $questionid,
+            'contextid'  => $contextid,
+        ]);
+
+        $context = context::instance_by_id($params['contextid']);
+        self::validate_context($context);
+
+        if (!has_capability('block/questionfilter:view', context_system::instance())) {
+            throw new moodle_exception('nopermission', 'block_questionfilter');
+        }
+
+        $qid = (int)$params['questionid'];
+
+        // Basisdaten der Frage laden.
+        $q = $DB->get_record('question', ['id' => $qid, 'parent' => 0], '*', MUST_EXIST);
+
+        // Fragetext bereinigen (HTML erlaubt, aber nur sichere Tags).
+        require_once($CFG->libdir . '/weblib.php');
+        $sysctx     = context_system::instance();
+        $questiontext = format_text($q->questiontext, $q->questiontextformat, [
+            'context' => $sysctx,
+            'noclean' => false,
+            'filter'  => false,
+        ]);
+
+        // Allgemeine Feedback-Felder abschneiden (kein Spoiler).
+        $result = [
+            'questionid'   => $qid,
+            'qtype'        => $q->qtype,
+            'name'         => $q->name,
+            'questiontext' => $questiontext,
+            'answers'      => [],
+            'hinttext'     => '',
+        ];
+
+        // Antwortoptionen je Fragetyp laden.
+        switch ($q->qtype) {
+            case 'multichoice':
+                $answers = $DB->get_records(
+                    'question_answers',
+                    ['question' => $qid],
+                    'fraction DESC, id ASC'
+                );
+                foreach ($answers as $a) {
+                    $result['answers'][] = [
+                        'text'    => format_text($a->answer, $a->answerformat, [
+                            'context' => $sysctx,
+                            'noclean' => false,
+                            'filter'  => false,
+                        ]),
+                        'correct' => ($a->fraction > 0),
+                    ];
+                }
+                break;
+
+            case 'truefalse':
+                $answers = $DB->get_records(
+                    'question_answers',
+                    ['question' => $qid],
+                    'id ASC'
+                );
+                foreach ($answers as $a) {
+                    $result['answers'][] = [
+                        'text'    => $a->answer === 'True' ? get_string('true', 'qtype_truefalse')
+                                                            : get_string('false', 'qtype_truefalse'),
+                        'correct' => ($a->fraction > 0),
+                    ];
+                }
+                break;
+
+            case 'shortanswer':
+                // Nur erste Musterloesung anzeigen (kein vollstaendiger Spoiler).
+                $answer = $DB->get_record_sql(
+                    "SELECT answer FROM {question_answers}
+                      WHERE question = :qid
+                   ORDER BY fraction DESC, id ASC",
+                    ['qid' => $qid],
+                    IGNORE_MULTIPLE
+                );
+                if ($answer) {
+                    $result['hinttext'] = get_string('preview_expectedanswer', 'block_questionfilter')
+                        . ': ' . s($answer->answer);
+                }
+                break;
+
+            case 'numerical':
+                $answer = $DB->get_record_sql(
+                    "SELECT answer, tolerance FROM {question_answers}
+                      WHERE question = :qid
+                   ORDER BY fraction DESC, id ASC",
+                    ['qid' => $qid],
+                    IGNORE_MULTIPLE
+                );
+                if ($answer) {
+                    $result['hinttext'] = get_string('preview_expectedanswer', 'block_questionfilter')
+                        . ': ' . s($answer->answer)
+                        . ($answer->tolerance > 0 ? ' ± ' . s($answer->tolerance) : '');
+                }
+                break;
+
+            case 'match':
+                $subquestions = $DB->get_records(
+                    'qtype_match_subquestions',
+                    ['questionid' => $qid],
+                    'id ASC'
+                );
+                foreach ($subquestions as $sub) {
+                    if (!empty($sub->questiontext)) {
+                        $result['answers'][] = [
+                            'text'    => s($sub->questiontext) . ' → ' . s($sub->answertext),
+                            'correct' => true,
+                        ];
+                    }
+                }
+                break;
+
+            default:
+                // Fuer alle anderen Typen nur den Fragetext anzeigen.
+                break;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Rueckgabestruktur fuer get_question_preview.
+     */
+    public static function get_question_preview_returns(): external_single_structure {
+        return new external_single_structure([
+            'questionid'   => new external_value(PARAM_INT),
+            'qtype'        => new external_value(PARAM_ALPHA),
+            'name'         => new external_value(PARAM_TEXT),
+            'questiontext' => new external_value(PARAM_RAW),
+            'answers'      => new external_multiple_structure(
+                new external_single_structure([
+                    'text'    => new external_value(PARAM_RAW),
+                    'correct' => new external_value(PARAM_BOOL),
+                ])
+            ),
+            'hinttext' => new external_value(PARAM_TEXT),
+        ]);
+    }
 }

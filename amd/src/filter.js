@@ -199,28 +199,6 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
             });
         }
 
-        // Vorschau-Modal schliessen
-        var modalClose = self.el('modal-close');
-        if (modalClose) {
-            modalClose.addEventListener('click', function() {
-                self.closePreview();
-            });
-        }
-        var modalBg = self.el('modal-bg');
-        if (modalBg) {
-            modalBg.addEventListener('click', function(e) {
-                if (e.target === modalBg) {
-                    self.closePreview();
-                }
-            });
-        }
-        // ESC-Taste schliesst Modal
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                self.closePreview();
-            }
-        });
-
         self.loadCategories();
     };
 
@@ -637,7 +615,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
                  + '<span class="small fw-semibold text-truncate" style="flex:1" '
                  + 'title="' + escHtml(q.name) + '">' + escHtml(q.name) + '</span>'
                  + '<button class="btn btn-sm qf-preview-btn flex-shrink-0" '
-                 + 'data-qid="' + q.id + '" data-qname="' + escHtml(q.name) + '" '
+                 + 'data-qid="' + q.id + '" '
                  + 'title="Vorschau anzeigen" '
                  + 'style="font-size:11px;color:#fff;background:#6b7280;border:none;'
                  + 'border-radius:4px;padding:1px 7px;line-height:1.6">'
@@ -677,7 +655,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
                 e.preventDefault();
-                self.openPreview(parseInt(this.dataset.qid, 10), this.dataset.qname);
+                self.openPreview(parseInt(this.dataset.qid, 10));
             });
         });
 
@@ -810,55 +788,28 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
     // ---------------------------------------------------------------
 
     /**
-     * Oeffnet das Vorschau-Modal fuer eine Frage.
+     * Oeffnet die Fragenvorschau.
      *
-     * @param {Number} qid   Fragen-ID.
-     * @param {String} qname Fragenname fuer den Modal-Titel.
+     * Angemeldete Nutzer: Moodle-Vorschauseite direkt in neuem Tab.
+     * Gaeste: Weiterleitung ueber guest_preview.php (loggt Pool-Nutzer ein)
+     *         ebenfalls in neuem Tab.
+     *
+     * @param {Number} qid Fragen-ID.
      */
-    BlockState.prototype.openPreview = function(qid, qname) {
+    BlockState.prototype.openPreview = function(qid) {
         var self = this;
-        var modalBg = self.el('modal-bg');
-        var iframe = self.el('preview-iframe');
-        var title = self.el('modal-title');
-        var spinner = self.el('modal-spinner');
-        if (!modalBg || !iframe) {
-            return;
-        }
-        if (title) {
-            title.textContent = qname;
-        }
-        if (spinner) {
-            spinner.style.display = '';
-        }
-        iframe.style.display = 'none';
-        iframe.src = '';
-        modalBg.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
+        var wwwroot = self.config.wwwroot || M.cfg.wwwroot;
+        var url;
 
-        var url = (self.config.wwwroot || M.cfg.wwwroot)
-            + '/question/bank/previewquestion/preview.php?id=' + qid;
-        iframe.src = url;
-        iframe.onload = function() {
-            if (spinner) {
-                spinner.style.display = 'none';
-            }
-            iframe.style.display = '';
-        };
-    };
+        if (self.config.isloggedin) {
+            // Angemeldeter Nutzer: direkt zur Moodle-Vorschauseite.
+            url = wwwroot + '/question/bank/previewquestion/preview.php?id=' + qid;
+        } else {
+            // Gast: Pool-Nutzer-Login-Endpunkt.
+            url = wwwroot + '/blocks/questionfilter/guest_preview.php?qid=' + qid;
+        }
 
-    /**
-     * Schliesst das Vorschau-Modal.
-     */
-    BlockState.prototype.closePreview = function() {
-        var modalBg = this.el('modal-bg');
-        var iframe = this.el('preview-iframe');
-        if (modalBg) {
-            modalBg.style.display = 'none';
-            document.body.style.overflow = '';
-        }
-        if (iframe) {
-            iframe.src = '';
-        }
+        window.open(url, 'qf_preview_' + qid, 'width=900,height=700,scrollbars=yes,resizable=yes');
     };
 
     // ---------------------------------------------------------------

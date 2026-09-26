@@ -104,6 +104,7 @@ class block_questionfilter extends block_base {
                 'qtypessource' => get_config('block_questionfilter', 'questiontypes_source') ?: 'installed',
                 'wwwroot' => $CFG->wwwroot,
                 'canexport' => $canexport,
+                'isloggedin' => (isloggedin() && !isguestuser()),
             ],
         ]);
 
