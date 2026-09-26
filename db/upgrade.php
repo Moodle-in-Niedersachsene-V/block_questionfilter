@@ -73,7 +73,8 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
 
     // Build 2026090514: Systemrolle fuer Fragenvorschau-Gaeste anlegen.
     if ($oldversion < 2026090514) {
-        require_once($CFG->dirroot . '/blocks/questionfilter/db/install.php');
+        global $CFG;
+        require_once(__DIR__ . '/install.php');
         block_questionfilter_setup_preview_role();
         upgrade_block_savepoint(true, 2026090514, 'questionfilter');
     }
