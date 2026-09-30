@@ -60,6 +60,8 @@ function block_questionfilter_setup_preview_role(): void {
         set_role_contextlevels($roleid, [CONTEXT_SYSTEM]);
         // Einzige Capability: Fragenvorschau.
         assign_capability('moodle/question:usemine', CAP_ALLOW, $roleid, $sysctx->id, true);
+        // Export-Capability fuer Pool-Nutzer.
+        assign_capability('block/questionfilter:export', CAP_ALLOW, $roleid, $sysctx->id, true);
         $role = $DB->get_record('role', ['id' => $roleid]);
     }
 

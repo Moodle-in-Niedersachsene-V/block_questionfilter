@@ -79,5 +79,16 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
         upgrade_block_savepoint(true, 2026090514, 'questionfilter');
     }
 
+    // Build 2026090524: Export-Capability zur Vorschau-Rolle hinzufuegen.
+    if ($oldversion < 2026090524) {
+        $roleshortname = 'questionfilter_preview';
+        $sysctx = context_system::instance();
+        $role = $DB->get_record('role', ['shortname' => $roleshortname]);
+        if ($role) {
+            assign_capability('block/questionfilter:export', CAP_ALLOW, $role->id, $sysctx->id, true);
+        }
+        upgrade_block_savepoint(true, 2026090524, 'questionfilter');
+    }
+
     return true;
 }
