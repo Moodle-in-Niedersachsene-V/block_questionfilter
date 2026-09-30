@@ -32,8 +32,7 @@
  */
 
 // No require_login() – intentional public endpoint, auth handled by complete_user_login() below.
-// nosemgrep: moodle-einstiegsdatei-ohne-login.
-require_once(__DIR__ . '/../../config.php'); // @codingStandardsIgnoreLine
+require_once(__DIR__ . '/../../config.php'); // @codingStandardsIgnoreLine nosemgrep: moodle-einstiegsdatei-ohne-login.
 
 $qid = required_param('qid', PARAM_INT);
 

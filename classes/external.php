@@ -126,10 +126,23 @@ class block_questionfilter_external extends external_api {
 
         $queryargs = $ctxargs;
 
-        // Freitext-Suche.
+        // Freitext-Suche: Fragentitel ODER Tags.
         if (!empty($params['search'])) {
-            $sql .= " AND " . $DB->sql_like('q.name', ':search', false);
-            $queryargs['search'] = '%' . $DB->sql_like_escape($params['search']) . '%';
+            $searchparam = '%' . $DB->sql_like_escape($params['search']) . '%';
+            $sql .= " AND (
+                " . $DB->sql_like('q.name', ':searchname', false) . "
+                OR EXISTS (
+                    SELECT 1
+                      FROM {tag_instance} ti
+                      JOIN {tag} t ON t.id = ti.tagid
+                     WHERE ti.itemid = q.id
+                       AND ti.itemtype = 'question'
+                       AND ti.component = 'core_question'
+                       AND " . $DB->sql_like('t.name', ':searchtag', false) . "
+                )
+            )";
+            $queryargs['searchname'] = $searchparam;
+            $queryargs['searchtag']  = $searchparam;
         }
 
         // Fragetyp-Filter.
