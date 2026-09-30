@@ -92,5 +92,24 @@ if (!$pooluser) {
 $pooluser = get_complete_user_data('id', $pooluser->id);
 complete_user_login($pooluser);
 
-// Direkt zur Moodle-Fragenvorschau weiterleiten.
-redirect(new moodle_url('/question/bank/previewquestion/preview.php', ['id' => $qid]));
+// Nach dem Login: Startseite neu laden (damit der Block canexport=true erhaelt)
+// und Fragenvorschau automatisch in neuem Fenster oeffnen.
+$previewurl = (new moodle_url('/question/bank/previewquestion/preview.php', ['id' => $qid]))->out(false);
+$homeurl    = (new moodle_url('/'))->out(false);
+
+$PAGE->set_context(context_system::instance());
+$PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php', ['qid' => $qid]));
+
+echo '<!DOCTYPE html><html><head><meta charset="utf-8">'
+    . '<title>Vorschau wird geöffnet …</title>'
+    . '<script>'
+    . 'window.open(' . json_encode($previewurl) . ', "qf_preview_' . (int)$qid . '",'
+    . '"width=900,height=700,scrollbars=yes,resizable=yes");'
+    . 'window.location.replace(' . json_encode($homeurl) . ');'
+    . '</script>'
+    . '</head><body>'
+    . '<p>Vorschau wird geöffnet …'
+    . ' <a href="' . s($previewurl) . '" target="_blank">Hier klicken</a>'
+    . ' falls das Fenster nicht erscheint.</p>'
+    . '</body></html>';
+exit;
