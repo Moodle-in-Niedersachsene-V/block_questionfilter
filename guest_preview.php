@@ -17,11 +17,8 @@
 /**
  * Gast-Vorschau-Endpunkt fuer block_questionfilter.
  *
- * Waehlt einen freien Pool-Nutzer (kursfilter_guest*) aus dem
- * block_kursfilter-Pool, loggt ihn ein und leitet direkt zur
- * Moodle-Fragenvorschau weiter. Gaeste erhalten so Zugriff auf
- * alle Fragetypen ohne eigenen Moodle-Account.
- *
+ * Waehlt einen Pool-Nutzer (kursfilter_guest*) aus, loggt ihn ein
+ * und zeigt eine Zwischenseite mit Links zur Vorschau und zur Startseite.
  * Kein require_login() – Endpunkt ist bewusst oeffentlich.
  *
  * Aufruf: /blocks/questionfilter/guest_preview.php?qid=42
@@ -31,8 +28,7 @@
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-// No require_login() – intentional public endpoint, auth handled by complete_user_login() below.
-require_once(__DIR__ . '/../../config.php'); // @codingStandardsIgnoreLine nosemgrep: moodle-einstiegsdatei-ohne-login.
+require_once(__DIR__ . '/../../config.php'); // @codingStandardsIgnoreLine
 
 $qid = required_param('qid', PARAM_INT);
 
@@ -55,7 +51,7 @@ if (isloggedin() && !isguestuser()) {
     redirect(new moodle_url('/question/bank/previewquestion/preview.php', ['id' => $qid]));
 }
 
-// Pool-Nutzer: zuerst kursfilter_guest*, dann questionfilter_guest* suchen.
+// Pool-Nutzer suchen: kursfilter_guest* oder questionfilter_guest*.
 $pooluser = null;
 $prefixes = ['kursfilter_guest', 'questionfilter_guest'];
 foreach ($prefixes as $prefix) {
@@ -75,7 +71,6 @@ foreach ($prefixes as $prefix) {
 }
 
 if (!$pooluser) {
-    // Kein Pool-Nutzer verfuegbar.
     $PAGE->set_context(context_system::instance());
     $PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php', ['qid' => $qid]));
     echo $OUTPUT->header();
@@ -91,24 +86,34 @@ if (!$pooluser) {
 $pooluser = get_complete_user_data('id', $pooluser->id);
 complete_user_login($pooluser);
 
-// Nach dem Login: Startseite neu laden (damit der Block canexport=true erhaelt)
-// und Fragenvorschau automatisch in neuem Fenster oeffnen.
+// URLs vorbereiten.
 $previewurl = (new moodle_url('/question/bank/previewquestion/preview.php', ['id' => $qid]))->out(false);
 $homeurl    = (new moodle_url('/'))->out(false);
 
+// Zwischenseite: Nutzer klickt selbst — kein automatisches window.open (wird von Browsern geblockt).
 $PAGE->set_context(context_system::instance());
 $PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php', ['qid' => $qid]));
+$PAGE->set_title(get_string('preview_ready_title', 'block_questionfilter'));
 
-echo '<!DOCTYPE html><html><head><meta charset="utf-8">'
-    . '<title>Vorschau wird geöffnet …</title>'
-    . '<script>'
-    . 'window.open(' . json_encode($previewurl) . ', "qf_preview_' . (int)$qid . '",'
-    . '"width=900,height=700,scrollbars=yes,resizable=yes");'
-    . 'window.location.replace(' . json_encode($homeurl) . ');'
-    . '</script>'
-    . '</head><body>'
-    . '<p>Vorschau wird geöffnet …'
-    . ' <a href="' . s($previewurl) . '" target="_blank">Hier klicken</a>'
-    . ' falls das Fenster nicht erscheint.</p>'
-    . '</body></html>';
-exit;
+echo $OUTPUT->header();
+
+echo html_writer::div(
+    html_writer::tag('h3', get_string('preview_ready_title', 'block_questionfilter'))
+    . html_writer::tag('p', get_string('preview_ready_desc', 'block_questionfilter'))
+    . html_writer::div(
+        html_writer::link(
+            $previewurl,
+            get_string('preview_open_btn', 'block_questionfilter') . ' ' . s($question->name),
+            ['class' => 'btn btn-primary btn-lg mr-3', 'target' => '_blank']
+        )
+        . html_writer::link(
+            $homeurl,
+            get_string('preview_back_btn', 'block_questionfilter'),
+            ['class' => 'btn btn-secondary btn-lg']
+        ),
+        'mt-3'
+    ),
+    'p-4'
+);
+
+echo $OUTPUT->footer();

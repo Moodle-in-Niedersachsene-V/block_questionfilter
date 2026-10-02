@@ -907,6 +907,53 @@ class block_questionfilter_external extends external_api {
     }
 
     // ---------------------------------------------------------------
+    // Check_capabilities: Aktuelle Nutzer-Capabilities pruefen.
+
+    /**
+     * Parameter fuer check_capabilities.
+     */
+    public static function check_capabilities_parameters(): external_function_parameters {
+        return new external_function_parameters([
+            'contextid' => new external_value(PARAM_INT, 'Kontext', VALUE_DEFAULT, 1),
+        ]);
+    }
+
+    /**
+     * Gibt die aktuellen Capabilities des eingeloggten Nutzers zurueck.
+     * Wird nach Pool-Login per AJAX aufgerufen damit JS die Export-Buttons
+     * korrekt ein- oder ausblendet.
+     *
+     * @param int $contextid Kontext-ID.
+     * @return array Capabilities als bool-Map.
+     */
+    public static function check_capabilities(int $contextid): array {
+        $params  = self::validate_parameters(
+            self::check_capabilities_parameters(),
+            ['contextid' => $contextid]
+        );
+        $context = context::instance_by_id($params['contextid']);
+        self::validate_context($context);
+
+        $sysctx = context_system::instance();
+        return [
+            'canexport'   => has_capability('block/questionfilter:export', $sysctx),
+            'canpreview'  => isloggedin() && !isguestuser(),
+            'isloggedin'  => isloggedin() && !isguestuser(),
+        ];
+    }
+
+    /**
+     * Rueckgabestruktur fuer check_capabilities.
+     */
+    public static function check_capabilities_returns(): external_single_structure {
+        return new external_single_structure([
+            'canexport'  => new external_value(PARAM_BOOL),
+            'canpreview' => new external_value(PARAM_BOOL),
+            'isloggedin' => new external_value(PARAM_BOOL),
+        ]);
+    }
+
+    // ---------------------------------------------------------------
     // Rate_question: Sternebewertung speichern (angemeldete + Gaeste).
 
     /**

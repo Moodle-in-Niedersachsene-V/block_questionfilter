@@ -71,6 +71,8 @@ class block_questionfilter extends block_base {
         return false;
     }
 
+
+
     /**
      * Erzeugt den Inhalt des Blocks.
      *
@@ -91,7 +93,8 @@ class block_questionfilter extends block_base {
             return $this->content;
         }
 
-        // Export-Berechtigung an JavaScript uebergeben.
+        // Export-Berechtigung pruefen und an JavaScript uebergeben.
+        // Wird jedes Mal neu berechnet damit Pool-Nutzer nach Login korrekte Buttons sehen.
         $canexport = has_capability('block/questionfilter:export', context_system::instance());
 
         // AMD-Modul laden.

@@ -200,6 +200,37 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         }
 
         self.loadCategories();
+
+        // Capabilities per AJAX pruefen — wichtig nach Pool-Login damit
+        // Export-Buttons korrekt angezeigt werden ohne Seiten-Reload.
+        self.refreshCapabilities();
+    };
+
+    /**
+     * Fragt die aktuellen Nutzer-Capabilities per AJAX ab und aktualisiert
+     * Export-Buttons und isloggedin-Flag. Wird beim Init aufgerufen.
+     */
+    BlockState.prototype.refreshCapabilities = function() {
+        var self = this;
+        Ajax.call([{
+            methodname: 'block_questionfilter_check_capabilities',
+            args: { contextid: self.config.contextid || 1 },
+            done: function(result) {
+                self.config.canexport  = result.canexport;
+                self.config.isloggedin = result.isloggedin;
+                // Export-Buttons sofort ein- oder ausblenden.
+                self.block().querySelectorAll('.qf-export').forEach(function(btn) {
+                    btn.style.display = result.canexport ? '' : 'none';
+                });
+                var addQuiz = self.block().querySelector('.qf-add-to-quiz');
+                if (addQuiz) {
+                    addQuiz.style.display = result.isloggedin ? '' : 'none';
+                }
+            },
+            fail: function() {
+                // Stille Fehlerbehandlung — Buttons bleiben im aktuellen Zustand.
+            },
+        }]);
     };
 
     // Dropdown Panel

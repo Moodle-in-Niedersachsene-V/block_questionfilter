@@ -67,6 +67,16 @@ $functions = [
         'capabilities' => 'block/questionfilter:export',
     ],
 
+    'block_questionfilter_check_capabilities' => [
+        'classname'     => 'block_questionfilter_external',
+        'methodname'    => 'check_capabilities',
+        'description'   => 'Prueft Capabilities des aktuellen Nutzers (nach Pool-Login)',
+        'type'          => 'read',
+        'ajax'          => true,
+        'loginrequired' => false,
+        'capabilities'  => '',
+    ],
+
     'block_questionfilter_rate_question' => [
         'classname'     => 'block_questionfilter_external',
         'methodname'    => 'rate_question',
