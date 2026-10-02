@@ -214,9 +214,9 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         var self = this;
         Ajax.call([{
             methodname: 'block_questionfilter_check_capabilities',
-            args: { contextid: self.config.contextid || 1 },
+            args: {contextid: self.config.contextid || 1},
             done: function(result) {
-                self.config.canexport  = result.canexport;
+                self.config.canexport = result.canexport;
                 self.config.isloggedin = result.isloggedin;
                 // Export-Buttons sofort ein- oder ausblenden.
                 self.block().querySelectorAll('.qf-export').forEach(function(btn) {
