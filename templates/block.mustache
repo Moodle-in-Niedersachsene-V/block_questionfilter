@@ -104,24 +104,21 @@
 
   <hr class="my-2">
 
-  {{! === Export-Leiste === }}
-  <div class="d-flex gap-1 flex-wrap align-items-center">
-    {{#export_xml}}
-    <button class="btn btn-sm btn-outline-secondary qf-export" data-format="xml" disabled>
+  {{! === Export-Leiste (immer im DOM, initial versteckt, JS blendet nach Capability-Check ein) === }}
+  <div class="d-flex gap-1 flex-wrap align-items-center" id="qf-export-bar-{{blockid}}">
+    <button class="btn btn-sm btn-outline-secondary qf-export"
+            data-format="xml" disabled style="display:none">
       <i class="fa fa-file-code-o"></i> XML
     </button>
-    {{/export_xml}}
-    {{#export_csv}}
-    <button class="btn btn-sm btn-outline-secondary qf-export" data-format="csv" disabled>
+    <button class="btn btn-sm btn-outline-secondary qf-export"
+            data-format="csv" disabled style="display:none">
       <i class="fa fa-table"></i> CSV
     </button>
-    {{/export_csv}}
-    {{#export_gift}}
-    <button class="btn btn-sm btn-outline-secondary qf-export" data-format="gift" disabled>
+    <button class="btn btn-sm btn-outline-secondary qf-export"
+            data-format="gift" disabled style="display:none">
       <i class="fa fa-file-text-o"></i> GIFT
     </button>
-    {{/export_gift}}
-    <button class="btn btn-sm btn-primary qf-add-to-quiz ms-auto" disabled>
+    <button class="btn btn-sm btn-primary qf-add-to-quiz ms-auto" disabled style="display:none">
       <i class="fa fa-plus"></i> Zum Test
     </button>
   </div>

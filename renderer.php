@@ -43,17 +43,12 @@ class block_questionfilter_renderer extends plugin_renderer_base {
         $diffraw = get_config('block_questionfilter', 'difficulty_levels') ?? "Leicht\nMittel\nSchwer";
         $difficulties = array_filter(array_map('trim', explode("\n", $diffraw)));
 
-        $exportformats = get_config('block_questionfilter', 'exportformats');
-        $fmts = is_array($exportformats) ? array_keys(array_filter($exportformats)) : ['xml', 'csv', 'gift'];
-
+        // Export-Buttons werden immer im DOM gerendert (initial display:none).
+        // JS blendet sie per refreshCapabilities() ein — auch nach Pool-Login.
         $templatedata = [
-            'blockid' => $blockid,
+            'blockid'      => $blockid,
             'difficulties' => array_values($difficulties),
-            'export_xml' => $canexport && in_array('xml', $fmts),
-            'export_csv' => $canexport && in_array('csv', $fmts),
-            'export_gift' => $canexport && in_array('gift', $fmts),
-            'canexport' => $canexport,
-            'scope_all' => (get_config('block_questionfilter', 'searchscope') ?: 'all') === 'all',
+            'scope_all'    => (get_config('block_questionfilter', 'searchscope') ?: 'all') === 'all',
         ];
 
         return $this->render_from_template('block_questionfilter/block', $templatedata);

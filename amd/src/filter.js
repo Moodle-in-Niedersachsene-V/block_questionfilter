@@ -218,9 +218,13 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
             done: function(result) {
                 self.config.canexport = result.canexport;
                 self.config.isloggedin = result.isloggedin;
-                // Export-Buttons sofort ein- oder ausblenden.
+                // Export-Formate aus Konfiguration ermitteln.
+                var formats = (self.config.exportformats || 'xml,csv,gift').split(',');
+                // Export-Buttons einblenden wenn Capability vorhanden.
                 self.block().querySelectorAll('.qf-export').forEach(function(btn) {
-                    btn.style.display = result.canexport ? '' : 'none';
+                    var fmt = btn.dataset.format;
+                    var allowed = result.canexport && formats.indexOf(fmt) !== -1;
+                    btn.style.display = allowed ? '' : 'none';
                 });
                 var addQuiz = self.block().querySelector('.qf-add-to-quiz');
                 if (addQuiz) {
