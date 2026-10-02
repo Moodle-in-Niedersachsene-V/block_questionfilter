@@ -204,6 +204,21 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         // Capabilities per AJAX pruefen — wichtig nach Pool-Login damit
         // Export-Buttons korrekt angezeigt werden ohne Seiten-Reload.
         self.refreshCapabilities();
+
+        // Nach Pool-Login: qf_preview-Parameter in URL pruefen und Vorschau oeffnen.
+        var urlParams = new URLSearchParams(window.location.search);
+        var previewQid = urlParams.get('qf_preview');
+        if (previewQid) {
+            var wwwroot = self.config.wwwroot || M.cfg.wwwroot;
+            window.open(
+                wwwroot + '/question/bank/previewquestion/preview.php?id=' + previewQid,
+                'qf_preview_' + previewQid,
+                'width=900,height=700,scrollbars=yes,resizable=yes'
+            );
+            // Parameter aus URL entfernen ohne Seiten-Reload.
+            var cleanUrl = window.location.pathname;
+            window.history.replaceState({}, '', cleanUrl);
+        }
     };
 
     /**

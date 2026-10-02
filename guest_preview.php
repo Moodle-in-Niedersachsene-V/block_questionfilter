@@ -51,6 +51,7 @@ if (isloggedin() && !isguestuser()) {
     redirect(new moodle_url('/question/bank/previewquestion/preview.php', ['id' => $qid]));
 }
 
+
 // Pool-Nutzer suchen: kursfilter_guest* oder questionfilter_guest*.
 $pooluser = null;
 $prefixes = ['kursfilter_guest', 'questionfilter_guest'];
@@ -86,34 +87,8 @@ if (!$pooluser) {
 $pooluser = get_complete_user_data('id', $pooluser->id);
 complete_user_login($pooluser);
 
-// URLs vorbereiten.
-$previewurl = (new moodle_url('/question/bank/previewquestion/preview.php', ['id' => $qid]))->out(false);
-$homeurl    = (new moodle_url('/'))->out(false);
-
-// Zwischenseite: Nutzer klickt selbst — kein automatisches window.open (wird von Browsern geblockt).
-$PAGE->set_context(context_system::instance());
-$PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php', ['qid' => $qid]));
-$PAGE->set_title(get_string('preview_ready_title', 'block_questionfilter'));
-
-echo $OUTPUT->header();
-
-echo html_writer::div(
-    html_writer::tag('h3', get_string('preview_ready_title', 'block_questionfilter'))
-    . html_writer::tag('p', get_string('preview_ready_desc', 'block_questionfilter'))
-    . html_writer::div(
-        html_writer::link(
-            $previewurl,
-            get_string('preview_open_btn', 'block_questionfilter') . ' ' . s($question->name),
-            ['class' => 'btn btn-primary btn-lg mr-3', 'target' => '_blank']
-        )
-        . html_writer::link(
-            $homeurl,
-            get_string('preview_back_btn', 'block_questionfilter'),
-            ['class' => 'btn btn-secondary btn-lg']
-        ),
-        'mt-3'
-    ),
-    'p-4'
-);
-
-echo $OUTPUT->footer();
+// Nach Login zur Startseite weiterleiten mit qf_preview-Parameter.
+// Die Startseite laedt mit aktiver Session (Export-Buttons sichtbar).
+// Der Parameter wird von filter.js erkannt und oeffnet die Vorschau automatisch.
+redirect(new moodle_url('/', ['qf_preview' => $qid]));
+exit;
