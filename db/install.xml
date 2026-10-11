@@ -33,8 +33,7 @@
         <FIELD NAME="timemodified" TYPE="int"  LENGTH="10" NOTNULL="true"/>
       </FIELDS>
       <KEYS>
-        <KEY NAME="primary"     TYPE="primary" FIELDS="id"/>
-        <KEY NAME="fk_question" TYPE="foreign" FIELDS="questionid" REFTABLE="question" REFFIELDS="id"/>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
       </KEYS>
       <INDEXES>
         <INDEX NAME="idx_questionid" UNIQUE="true"  FIELDS="questionid"/>

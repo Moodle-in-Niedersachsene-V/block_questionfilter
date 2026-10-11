@@ -101,7 +101,6 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
             $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL);
             $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL);
             $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
-            $table->add_key('fk_question', XMLDB_KEY_FOREIGN, ['questionid'], 'question', ['id']);
             $table->add_index('idx_questionid', XMLDB_INDEX_UNIQUE, ['questionid']);
             $table->add_index('idx_status', XMLDB_INDEX_NOTUNIQUE, ['status']);
             $dbman->create_table($table);
