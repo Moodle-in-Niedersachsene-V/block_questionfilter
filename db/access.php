@@ -75,6 +75,18 @@ $capabilities = [
             'manager' => CAP_ALLOW,
         ],
     ],
+
+    // KI-Verschlagwortung: Tag-Vorschlaege pruefen und freigeben.
+    // RISK_SPAM: Freigabe schreibt Tags in die Moodle-Fragenbank.
+    'block/questionfilter:reviewtags' => [
+        'riskbitmask' => RISK_SPAM,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes' => [
+            'editingteacher' => CAP_ALLOW,
+            'manager' => CAP_ALLOW,
+        ],
+    ],
 ];
 
 // Hinweis zu Moodle 5.0 und neuer.

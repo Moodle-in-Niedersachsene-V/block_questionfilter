@@ -14,12 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace block_questionfilter\task;
-
-use block_questionfilter\tag_suggester;
-
 /**
- * Scheduled task: AI-based tag generation for questions without a tag suggestion.
+ * Scheduled task: AI-based tag generation for questions.
+ *
+ * Uses block_questionfilter\ai_connector (direct Ollama/Claude call),
+ * NOT Moodle's core_ai subsystem.
  *
  * Each question is processed once; the outcome is stored in
  * block_questionfilter_tag_pending with status:
@@ -27,12 +26,19 @@ use block_questionfilter\tag_suggester;
  *   'pending'  — suggestion stored, waiting for manual review
  *   'empty'    — no suitable tag found
  *
- * A failed request leaves no record, so the question is retried on the next run.
- *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @author     Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+namespace block_questionfilter\task;
+
+use block_questionfilter\ai_connector;
+
+/**
+ * Processes a batch of questions without AI-generated tags and
+ * stores suggestions in the pending-review table.
  */
 class generate_tags extends \core\task\scheduled_task {
     /** Questions per run when the setting is missing. */
@@ -48,11 +54,12 @@ class generate_tags extends \core\task\scheduled_task {
     }
 
     /**
-     * Processes the next batch of questions; a failed question does not stop
-     * the others, but causes the task to report a failure at the end.
+     * Processes the next batch of questions.
      *
-     * @throws \moodle_exception If AI tagging is enabled but no provider is configured,
-     *                           or if any question could not be processed.
+     * A failed question does not stop the others, but causes the task to
+     * report a failure at the end.
+     *
+     * @throws \moodle_exception If AI tagging is disabled or any question could not be processed.
      */
     public function execute(): void {
         if (!get_config('block_questionfilter', 'ai_enabled')) {
@@ -60,15 +67,12 @@ class generate_tags extends \core\task\scheduled_task {
             return;
         }
 
-        if (!tag_suggester::is_available()) {
-            throw new \moodle_exception('error_ai_unavailable', 'block_questionfilter');
-        }
-
         $autoapply = (bool)get_config('block_questionfilter', 'ai_autoapply');
         $batchsize = (int)(get_config('block_questionfilter', 'ai_batch_size') ?: self::DEFAULT_BATCH_SIZE);
-        $userid    = (int)get_admin()->id;
+        $connector = new ai_connector();
 
         $questions = self::next_questions($batchsize);
+
         if (empty($questions)) {
             mtrace('block_questionfilter: Keine unverarbeiteten Fragen gefunden.');
             return;
@@ -77,7 +81,7 @@ class generate_tags extends \core\task\scheduled_task {
         $failed = 0;
         foreach ($questions as $question) {
             try {
-                $tags   = tag_suggester::suggest($question, $question->categoryname, $userid);
+                $tags   = $connector->suggest_tags($question->name, $question->questiontext, $question->qtype);
                 $status = self::record_outcome($question, $tags, $autoapply);
                 mtrace("block_questionfilter: Frage {$question->id} ({$question->name}): "
                     . $status . ' (' . implode(', ', $tags) . ')');
@@ -104,21 +108,18 @@ class generate_tags extends \core\task\scheduled_task {
      * existing entry in block_questionfilter_tag_pending are skipped.
      *
      * @param int $limit Maximum number of questions.
-     * @return \stdClass[] Question records with categoryname.
+     * @return \stdClass[] Question records.
      */
     private static function next_questions(int $limit): array {
         global $DB;
 
-        $sql = "SELECT q.id, q.name, q.qtype, q.questiontext,
-                       qc.name AS categoryname
+        $sql = "SELECT q.id, q.name, q.qtype, q.questiontext
                   FROM {question} q
-                  JOIN {question_versions} qv  ON qv.questionid = q.id
-                  JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
-                  JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
-             LEFT JOIN {block_questionfilter_tag_pending} tp ON tp.questionid = q.id
                  WHERE q.parent = 0
-                   AND qv.status = 'ready'
-                   AND tp.id IS NULL
+                   AND NOT EXISTS (
+                       SELECT 1 FROM {block_questionfilter_tag_pending} tp
+                        WHERE tp.questionid = q.id
+                   )
               ORDER BY q.id ASC";
 
         return $DB->get_records_sql($sql, [], 0, $limit);
@@ -127,10 +128,10 @@ class generate_tags extends \core\task\scheduled_task {
     /**
      * Stores the tagging result and optionally writes tags to Moodle's tag system.
      *
-     * @param \stdClass $question   Question record (must have id, questionid via qbe).
+     * @param \stdClass $question   Question record (must have id, name, qtype).
      * @param string[]  $tags       Suggested tag values.
      * @param bool      $autoapply  Whether to write tags immediately.
-     * @return string               Recorded status ('applied', 'pending' or 'empty').
+     * @return string               Recorded status ('applied', 'pending', or 'empty').
      */
     private static function record_outcome(\stdClass $question, array $tags, bool $autoapply): string {
         global $DB;
@@ -168,7 +169,7 @@ class generate_tags extends \core\task\scheduled_task {
     public static function apply_tags(int $questionid, array $tags): void {
         global $DB;
 
-        // Moodle 4.x stores question tags on question_bank_entries, not on question directly.
+        // Moodle 4.x+ stores question tags on question_bank_entries.
         $qbe = $DB->get_record_sql(
             "SELECT qbe.id, qc.contextid
                FROM {question_bank_entries} qbe

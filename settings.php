@@ -119,11 +119,22 @@ if ($ADMIN->fulltree) {
         PARAM_INT
     ));
 
-    // KI-Verschlagwortung.
+    // KI-Verschlagwortung — Hauptschalter und Review-Link.
     $settings->add(new admin_setting_heading(
         'block_questionfilter/ai_heading',
         get_string('settings_ai_heading', 'block_questionfilter'),
         get_string('settings_ai_desc', 'block_questionfilter')
+    ));
+
+    $reviewurl = new moodle_url('/blocks/questionfilter/review.php');
+    $settings->add(new admin_setting_heading(
+        'block_questionfilter/ai_review_link',
+        get_string('settings_review_heading', 'block_questionfilter'),
+        html_writer::link(
+            $reviewurl,
+            get_string('settings_review_link', 'block_questionfilter'),
+            ['class' => 'btn btn-primary']
+        )
     ));
 
     $settings->add(new admin_setting_configcheckbox(
@@ -145,6 +156,89 @@ if ($ADMIN->fulltree) {
         get_string('settings_ai_batch_size', 'block_questionfilter'),
         get_string('settings_ai_batch_size_help', 'block_questionfilter'),
         '20',
+        PARAM_INT
+    ));
+
+    // KI-Backend-Auswahl.
+    $settings->add(new admin_setting_heading(
+        'block_questionfilter/ai_backend_heading',
+        get_string('settings_ai_backend_heading', 'block_questionfilter'),
+        get_string('settings_ai_backend_desc', 'block_questionfilter')
+    ));
+
+    $settings->add(new admin_setting_configselect(
+        'block_questionfilter/ai_backend',
+        get_string('settings_ai_backend', 'block_questionfilter'),
+        get_string('settings_ai_backend_help', 'block_questionfilter'),
+        'ollama',
+        [
+            'ollama' => get_string('ai_backend_ollama', 'block_questionfilter'),
+            'claude' => get_string('ai_backend_claude', 'block_questionfilter'),
+        ]
+    ));
+
+    // Ollama-Einstellungen.
+    $settings->add(new admin_setting_heading(
+        'block_questionfilter/ai_ollama_heading',
+        get_string('settings_ai_ollama_heading', 'block_questionfilter'),
+        ''
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_questionfilter/ai_ollama_url',
+        get_string('settings_ai_ollama_url', 'block_questionfilter'),
+        get_string('settings_ai_ollama_url_help', 'block_questionfilter'),
+        'http://localhost:11434'
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_questionfilter/ai_ollama_model',
+        get_string('settings_ai_ollama_model', 'block_questionfilter'),
+        get_string('settings_ai_ollama_model_help', 'block_questionfilter'),
+        'gemma3:4b'
+    ));
+
+    // Claude API-Einstellungen.
+    $settings->add(new admin_setting_heading(
+        'block_questionfilter/ai_claude_heading',
+        get_string('settings_ai_claude_heading', 'block_questionfilter'),
+        get_string('settings_ai_claude_desc', 'block_questionfilter')
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_questionfilter/ai_claude_apikey',
+        get_string('settings_ai_claude_apikey', 'block_questionfilter'),
+        get_string('settings_ai_claude_apikey_help', 'block_questionfilter'),
+        '',
+        PARAM_RAW
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_questionfilter/ai_claude_model',
+        get_string('settings_ai_claude_model', 'block_questionfilter'),
+        get_string('settings_ai_claude_model_help', 'block_questionfilter'),
+        'claude-haiku-4-5-20251001'
+    ));
+
+    // Tagging-Optionen.
+    $settings->add(new admin_setting_heading(
+        'block_questionfilter/ai_tagging_heading',
+        get_string('settings_ai_tagging_heading', 'block_questionfilter'),
+        ''
+    ));
+
+    $settings->add(new admin_setting_configtextarea(
+        'block_questionfilter/ai_tag_categories',
+        get_string('settings_ai_tag_categories', 'block_questionfilter'),
+        get_string('settings_ai_tag_categories_help', 'block_questionfilter'),
+        "Mathematik\nPhysik\nChemie\nBiologie\nInformatik\nDeutsch\nEnglisch"
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_questionfilter/ai_max_tags',
+        get_string('settings_ai_max_tags', 'block_questionfilter'),
+        get_string('settings_ai_max_tags_help', 'block_questionfilter'),
+        '5',
         PARAM_INT
     ));
 }
