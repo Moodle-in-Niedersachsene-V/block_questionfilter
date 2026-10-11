@@ -42,7 +42,9 @@ $capabilities = [
     ],
 
     // Export nur fuer Lehrkraefte aufwaerts.
+    // RISK_PERSONAL: Fragen koennen personenbezogene Inhalte enthalten (z. B. Aufgabentexte mit Namen).
     'block/questionfilter:export' => [
+        'riskbitmask' => RISK_PERSONAL,
         'captype' => 'read',
         'contextlevel' => CONTEXT_SYSTEM,
         'archetypes' => [

@@ -205,20 +205,62 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         // Export-Buttons korrekt angezeigt werden ohne Seiten-Reload.
         self.refreshCapabilities();
 
-        // Nach Pool-Login: qf_preview-Parameter in URL pruefen und Vorschau oeffnen.
-        var urlParams = new URLSearchParams(window.location.search);
-        var previewQid = urlParams.get('qf_preview');
-        if (previewQid) {
-            var wwwroot = self.config.wwwroot || M.cfg.wwwroot;
-            window.open(
-                wwwroot + '/question/bank/previewquestion/preview.php?id=' + previewQid,
-                'qf_preview_' + previewQid,
-                'width=900,height=700,scrollbars=yes,resizable=yes'
-            );
-            // Parameter aus URL entfernen ohne Seiten-Reload.
-            var cleanUrl = window.location.pathname;
-            window.history.replaceState({}, '', cleanUrl);
-        }
+        // postMessage-Listener: Pool-Login-Tab sendet 'qf_pool_login_done'
+        // wenn der Pool-Nutzer eingeloggt wurde. Dann refreshCapabilities()
+        // erneut aufrufen damit Export-Buttons ohne Seiten-Reload erscheinen.
+        var wwwroot = self.config.wwwroot || M.cfg.wwwroot;
+        window.addEventListener('message', function(event) {
+            // Origin prüfen – nur Nachrichten vom eigenen Moodle akzeptieren.
+            if (event.origin !== new URL(wwwroot).origin) {
+                return;
+            }
+            if (event.data && event.data.type === 'qf_pool_login_done') {
+                // Auswahl vor dem Reload in sessionStorage sichern,
+                // damit sie nach dem Reload wiederhergestellt werden kann.
+                try {
+                    sessionStorage.setItem(
+                        'qf_restore_selection_' + self.blockid,
+                        JSON.stringify({
+                            ids: Object.keys(self.selected),
+                            search: self.search,
+                            cats: self.cats,
+                            types: self.types,
+                            diffs: self.diffs,
+                            tags: self.tags,
+                        })
+                    );
+                } catch (e) { /* ignore */ }
+                // Session-Cookie hat sich geändert (Pool-Nutzer eingeloggt).
+                // Seite neu laden damit Moodle-Session und AJAX-Token übereinstimmen.
+                window.location.reload();
+            }
+        });
+
+        // Auswahl + Suchzustand nach Pool-Login-Reload wiederherstellen.
+        try {
+            var restoreKey = 'qf_restore_selection_' + self.blockid;
+            var stored = sessionStorage.getItem(restoreKey);
+            if (stored) {
+                sessionStorage.removeItem(restoreKey);
+                var snap = JSON.parse(stored);
+                if (snap && Array.isArray(snap.ids) && snap.ids.length) {
+                    // Suchzustand wiederherstellen.
+                    self.search = snap.search || '';
+                    self.cats   = snap.cats   || {};
+                    self.types  = snap.types  || {};
+                    self.diffs  = snap.diffs  || {};
+                    self.tags   = snap.tags   || [];
+                    // IDs sofort in selected setzen damit updateFooter
+                    // die Export-Buttons sofort aktiviert.
+                    snap.ids.forEach(function(id) {
+                        self.selected[String(id)] = true;
+                    });
+                    self.updateFooter();
+                    // Suche mit wiederhergestellten Parametern auslösen.
+                    self.triggerSearch();
+                }
+            }
+        } catch (e) { /* ignore */ }
     };
 
     /**
@@ -233,13 +275,15 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
             done: function(result) {
                 self.config.canexport = result.canexport;
                 self.config.isloggedin = result.isloggedin;
-                // Export-Formate aus Konfiguration ermitteln.
-                var formats = (self.config.exportformats || 'xml,csv,gift').split(',');
+                // Export-Formate vom Server verwenden (korrekt aufgeloest).
+                var fmtStr = result.exportformats || self.config.exportformats || 'xml,csv,gift';
+                var formats = fmtStr.split(',').map(function(s) {return s.trim();});
                 // Export-Buttons einblenden wenn Capability vorhanden.
                 self.block().querySelectorAll('.qf-export').forEach(function(btn) {
                     var fmt = btn.dataset.format;
                     var allowed = result.canexport && formats.indexOf(fmt) !== -1;
                     btn.style.display = allowed ? '' : 'none';
+                    btn.disabled = !allowed;
                 });
                 var addQuiz = self.block().querySelector('.qf-add-to-quiz');
                 if (addQuiz) {
@@ -247,7 +291,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
                 }
             },
             fail: function() {
-                // Stille Fehlerbehandlung — Buttons bleiben im aktuellen Zustand.
+                // Stille Fehlerbehandlung — Buttons bleiben verborgen.
             },
         }]);
     };
@@ -797,14 +841,9 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
             fail: Notification.exception,
         }]);
     };
-    BlockState.prototype.addToQuiz = function() {
-        var ids = Object.keys(this.selected);
-        if (!ids.length) {
-            return;
-        }
-        window.location.href = M.cfg.wwwroot
-            + '/question/bank/managecategories/index.php?courseid=1&qids=' + ids.join(',');
-    };
+    // addToQuiz: vorerst deaktiviert — Pool-Nutzer haben keine Test-Bearbeitungsrechte.
+    // Reaktivieren sobald ein konkreter Quiz-Kontext (Kurs + Quiz-ID) bekannt ist.
+    BlockState.prototype.addToQuiz = function() { /* noop */ };
 
     /**
      * Session-Hash fuer Gast-Bewertungen — einmalig pro Sitzung erzeugen.

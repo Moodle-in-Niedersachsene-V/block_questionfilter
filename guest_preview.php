@@ -87,8 +87,39 @@ if (!$pooluser) {
 $pooluser = get_complete_user_data('id', $pooluser->id);
 complete_user_login($pooluser);
 
-// Nach Login zur Startseite weiterleiten mit qf_preview-Parameter.
-// Die Startseite laedt mit aktiver Session (Export-Buttons sichtbar).
-// Der Parameter wird von filter.js erkannt und oeffnet die Vorschau automatisch.
-redirect(new moodle_url('/', ['qf_preview' => $qid]));
+// Nach Login: Zwischenseite ausgeben, die per postMessage dem Opener-Tab
+// bescheid gibt (damit dort refreshCapabilities() laeuft und die Export-Buttons
+// erscheinen) und dann direkt zur Fragenvorschau navigiert.
+$previewurl = (new moodle_url(
+    '/question/bank/previewquestion/preview.php',
+    ['id' => $qid]
+))->out(false);
+
+$PAGE->set_context(context_system::instance());
+$PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php', ['qid' => $qid]));
+$PAGE->set_pagelayout('embedded');
+echo $OUTPUT->header();
+
+$wwwrootjson  = json_encode($CFG->wwwroot);
+$previewurljson = json_encode($previewurl);
+
+echo <<<HTML
+<script>
+(function() {
+    // Opener (Block-Seite) informieren, dass Pool-Login abgeschlossen ist.
+    if (window.opener && !window.opener.closed) {
+        try {
+            window.opener.postMessage(
+                {type: 'qf_pool_login_done'},
+                {$wwwrootjson}
+            );
+        } catch (e) { /* cross-origin guard */ }
+    }
+    // Direkt zur Fragenvorschau navigieren.
+    window.location.replace({$previewurljson});
+})();
+</script>
+HTML;
+
+echo $OUTPUT->footer();
 exit;

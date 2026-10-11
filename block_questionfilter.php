@@ -103,7 +103,12 @@ class block_questionfilter extends block_base {
                 'blockid' => (int)$this->instance->id,
                 'contextid' => (int)$this->page->context->id,
                 'searchscope' => get_config('block_questionfilter', 'searchscope') ?: 'all',
-                'exportformats' => get_config('block_questionfilter', 'exportformats') ?: 'xml,csv,gift',
+                'exportformats' => (function () {
+                    $fmt = get_config('block_questionfilter', 'exportformats');
+                    return is_array($fmt)
+                        ? (implode(',', array_keys(array_filter($fmt))) ?: 'xml,csv,gift')
+                        : ($fmt ?: 'xml,csv,gift');
+                })(),
                 'qtypessource' => get_config('block_questionfilter', 'questiontypes_source') ?: 'installed',
                 'wwwroot' => $CFG->wwwroot,
                 'canexport' => $canexport,

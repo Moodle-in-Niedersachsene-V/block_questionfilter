@@ -35,6 +35,49 @@ require_once($CFG->libdir . '/externallib.php');
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class block_questionfilter_external extends external_api {
+    /** Maximale Anfragen pro Nutzer im Rate-Limit-Zeitfenster. */
+    const RATE_LIMIT_REQUESTS = 30;
+
+    /** Länge des Rate-Limit-Zeitfensters in Sekunden. */
+    const RATE_LIMIT_WINDOW = 60;
+
+    /** Absolutes Maximum für zurückgegebene Ergebnisse (DoS-Schutz). */
+    const MAX_RESULT_LIMIT = 200;
+
+    /** Standard-Ergebnislimit wenn der Aufrufer keinen Wert übergibt. */
+    const DEFAULT_RESULT_LIMIT = 200;
+
+    /**
+     * Prüft das gleitende Rate-Limit für den angegebenen Nutzer.
+     *
+     * Wirft eine moodle_exception, wenn der Nutzer mehr als RATE_LIMIT_REQUESTS
+     * Anfragen innerhalb von RATE_LIMIT_WINDOW Sekunden gestellt hat.
+     *
+     * @param int $userid Moodle-Nutzer-ID.
+     * @throws \moodle_exception Bei überschrittenem Rate-Limit.
+     */
+    private static function check_rate_limit(int $userid): void {
+        $cache = \cache::make('block_questionfilter', 'ratelimit');
+        $key   = 'rl_' . $userid;
+        $now   = time();
+        $data  = $cache->get($key);
+
+        if ($data === false || ($now - $data['window_start']) >= self::RATE_LIMIT_WINDOW) {
+            $cache->set($key, ['count' => 1, 'window_start' => $now]);
+            return;
+        }
+
+        $data['count']++;
+        $cache->set($key, $data);
+
+        if ($data['count'] > self::RATE_LIMIT_REQUESTS) {
+            $remaining = self::RATE_LIMIT_WINDOW - ($now - $data['window_start']);
+            throw new \moodle_exception('ratelimitexceeded', 'block_questionfilter', '', (object)[
+                'seconds' => max(1, (int)$remaining),
+            ]);
+        }
+    }
+
     /**
      * Beschreibt die Parameter der Suchfunktion.
      *
@@ -96,12 +139,18 @@ class block_questionfilter_external extends external_api {
         }
 
         // Berechtigungsprüfung — eigene Capability, Gäste können erlaubt werden.
-        $context = context::instance_by_id($params['contextid']);
+        $context = $params['contextid'] > 0
+            ? context::instance_by_id($params['contextid'], IGNORE_MISSING) ?? context_system::instance()
+            : context_system::instance();
         self::validate_context($context);
 
         if (!has_capability('block/questionfilter:view', context_system::instance())) {
             throw new moodle_exception('nopermission', 'block_questionfilter');
         }
+
+        // Rate-Limit: max. RATE_LIMIT_REQUESTS Anfragen pro Nutzer in RATE_LIMIT_WINDOW Sekunden.
+        global $USER;
+        self::check_rate_limit((int)$USER->id);
 
         // Kontexte sammeln je nach Suchbereich.
         $contextids = self::get_searchable_contextids($params['scope'], $params['contextid']);
@@ -291,7 +340,9 @@ class block_questionfilter_external extends external_api {
             self::get_categories_parameters(),
             ['scope' => $scope, 'contextid' => $contextid]
         );
-        $context = context::instance_by_id($params['contextid']);
+        $context = $params['contextid'] > 0
+            ? context::instance_by_id($params['contextid'], IGNORE_MISSING) ?? context_system::instance()
+            : context_system::instance();
         self::validate_context($context);
 
         if (!has_capability('block/questionfilter:view', context_system::instance())) {
@@ -375,7 +426,9 @@ class block_questionfilter_external extends external_api {
             self::get_questiontypes_parameters(),
             ['scope' => $scope, 'contextid' => $contextid, 'source' => $source]
         );
-        $context = context::instance_by_id($params['contextid']);
+        $context = $params['contextid'] > 0
+            ? context::instance_by_id($params['contextid'], IGNORE_MISSING) ?? context_system::instance()
+            : context_system::instance();
         self::validate_context($context);
 
         if (!has_capability('block/questionfilter:view', context_system::instance())) {
@@ -483,7 +536,9 @@ class block_questionfilter_external extends external_api {
             'contextid' => $contextid,
         ]);
 
-        $context = context::instance_by_id($params['contextid']);
+        // System-Kontext direkt verwenden — Export ist immer systemweit.
+        // context::instance_by_id() wuerde bei contextid=0 eine Exception werfen.
+        $context = context_system::instance();
         self::validate_context($context);
 
         // Export erfordert eigene Capability (nicht für Gäste).
@@ -592,7 +647,9 @@ class block_questionfilter_external extends external_api {
         }
 
         if ($scope === 'course') {
-            $ctx = context::instance_by_id($contextid);
+            $ctx = $contextid > 0
+                ? (context::instance_by_id($contextid, IGNORE_MISSING) ?? $sysctx)
+                : $sysctx;
             $coursectx = $ctx->get_course_context(false);
             $ids = $coursectx ? [$coursectx->id, $sysctx->id] : [$sysctx->id];
 
@@ -769,30 +826,56 @@ class block_questionfilter_external extends external_api {
             return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<quiz>\n</quiz>\n";
         }
 
-        // Get_question_options() befüllt jede Frage mit Antworten, Hints,.
-        // Und bei qtype_multianswer mit den Unterfragen (subquestions als stdClass).
+        // Get_question_options() befüllt jede Frage mit Antworten, Hints,
+        // und bei qtype_multianswer mit Unterfragen (subquestions als stdClass).
+        // qtype muss explizit als String gesetzt werden, da qformat_xml intern
+        // (string)$q->qtype aufruft und bei Objekten eine PHP-Exception wirft.
+        $sysctx = context_system::instance();
         $questions = [];
         foreach ($rows as $q) {
+            $q->qtype = (string)$q->qtype; // Sicherstellen: qtype ist String.
+            $q->category = (int)$q->category;
             get_question_options($q); // Ergaenzt $q um Antworten und Hinweise.
+            // Bei multianswer: Unterfragen ebenfalls absichern.
+            if ($q->qtype === 'multianswer' && !empty($q->options->questions)) {
+                foreach ($q->options->questions as $sub) {
+                    if (is_object($sub)) {
+                        $sub->qtype = (string)($sub->qtype ?? 'shortanswer');
+                    }
+                }
+            }
             $questions[] = $q;
         }
 
-        // Exportprocess(true) gibt den XML-String direkt zurück.
+        // Writequestion() pro Frage aufrufen statt exportprocess().
+        // exportprocess() liest Kategorie-Kontexte aus der DB und ruft intern
+        // context::instance_by_id() auf – das wirft bei ungültigen Kontext-IDs
+        // eine Exception. Durch den Aufruf von writequestion() pro Frage
+        // umgehen wir diesen Code-Pfad vollständig.
         $qformat = new qformat_xml();
-        $qformat->setQuestions($questions);
-        $qformat->setContexts([context_system::instance()]);
+        $qformat->setContexts([$sysctx]);
         $qformat->setCattofile(false);
         $qformat->setContexttofile(false);
 
-        if (!$qformat->exportpreprocess()) {
-            throw new moodle_exception('exportfailed', 'block_questionfilter');
+        $xmlparts = [];
+        foreach ($questions as $q) {
+            try {
+                $part = $qformat->writequestion($q);
+                if ($part !== false && $part !== '') {
+                    $xmlparts[] = $part;
+                }
+            } catch (Exception $e) {
+                // Nicht unterstützte Fragetypen überspringen.
+                debugging(
+                    'XML export skipped question ' . $q->id . ': ' . $e->getMessage(),
+                    DEBUG_DEVELOPER
+                );
+            }
         }
 
-        $content = $qformat->exportprocess(true);
-
-        if ($content === false || $content === '') {
-            throw new moodle_exception('exportfailed', 'block_questionfilter');
-        }
+        $content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<quiz>\n"
+            . implode('', $xmlparts)
+            . "</quiz>\n";
 
         return $content;
     }
@@ -838,8 +921,9 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * GIFT-Export über Moodles native qformat_gift-Engine (falls verfügbar),
-     * sonst einfaches Fallback-Format.
+     * GIFT-Export ueber Moodles native qformat_gift-Engine.
+     * Verwendet rohe DB-Datensaetze (stdClass) wie der XML-Export,
+     * da qformat_gift::writequestion() stdClass erwartet, nicht question_definition.
      *
      * @param array $ids Liste der Fragen-IDs.
      * @return string Inhalt der Exportdatei.
@@ -854,38 +938,55 @@ class block_questionfilter_external extends external_api {
             require_once($CFG->dirroot . '/question/format.php');
             require_once($giftformatfile);
 
-            $questions = [];
-            foreach ($ids as $qid) {
-                try {
-                    $q = question_bank::load_question($qid);
-                    if ($q) {
-                        $questions[] = $q;
-                    }
-                } catch (Exception $e) {
-                    // Fehlerhafte Frage wird uebersprungen.
-                    debugging($e->getMessage(), DEBUG_DEVELOPER);
-                }
-            }
+            // Rohe DB-Datensaetze laden (stdClass) — genau wie beim XML-Export.
+            [$insql, $args] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'qid');
+            $rows = $DB->get_records_sql(
+                "SELECT q.*, qc.id AS category
+                   FROM {question} q
+                   JOIN {question_versions} qv      ON qv.questionid        = q.id
+                   JOIN {question_bank_entries} qbe  ON qbe.id              = qv.questionbankentryid
+                   JOIN {question_categories} qc     ON qc.id               = qbe.questioncategoryid
+                  WHERE q.id $insql
+                    AND q.parent = 0",
+                $args
+            );
 
-            if (!empty($questions)) {
+            if (!empty($rows)) {
                 $qformat = new qformat_gift();
+                $qformat->setContexts([context_system::instance()]);
+                $qformat->setCattofile(false);
+                $qformat->setContexttofile(false);
+
                 $output = '// GIFT Export – ' . date('Y-m-d H:i:s') . "\n\n";
-                foreach ($questions as $q) {
+                foreach ($rows as $q) {
+                    $q->qtype = (string)$q->qtype;
                     try {
+                        get_question_options($q);
+                        // Bei multianswer Unterfragen absichern.
+                        if ($q->qtype === 'multianswer' && !empty($q->options->questions)) {
+                            foreach ($q->options->questions as $sub) {
+                                if (is_object($sub)) {
+                                    $sub->qtype = (string)($sub->qtype ?? 'shortanswer');
+                                }
+                            }
+                        }
                         $line = $qformat->writequestion($q);
                         if ($line) {
                             $output .= $line . "\n";
                         }
                     } catch (Exception $e) {
-                        // Fehlerhafte Frage wird uebersprungen.
-                        debugging($e->getMessage(), DEBUG_DEVELOPER);
+                        // Nicht unterstuetzte Fragetypen (z. B. ordering) ueberspringen.
+                        debugging(
+                            'GIFT export skipped question ' . $q->id . ': ' . $e->getMessage(),
+                            DEBUG_DEVELOPER
+                        );
                     }
                 }
                 return $output;
             }
         }
 
-        // Fallback: einfaches Textformat.
+        // Fallback: einfaches Textformat (wenn qformat_gift nicht verfuegbar).
         [$insql, $args] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'q');
         $questions = $DB->get_records_sql(
             "SELECT q.id, q.name, q.qtype, q.questiontext, qc.name AS categoryname
@@ -931,14 +1032,27 @@ class block_questionfilter_external extends external_api {
             self::check_capabilities_parameters(),
             ['contextid' => $contextid]
         );
-        $context = context::instance_by_id($params['contextid']);
-        self::validate_context($context);
 
+        // System-Kontext verwenden — context::instance_by_id() wuerde bei
+        // contextid=0 oder ungueltigem Wert eine Exception werfen.
         $sysctx = context_system::instance();
+        self::validate_context($sysctx);
+
+        $fmtconfig = get_config('block_questionfilter', 'exportformats');
+        if (is_array($fmtconfig)) {
+            $formats = implode(',', array_keys(array_filter($fmtconfig)));
+        } else {
+            $formats = 'xml,csv,gift';
+        }
+        if (empty($formats)) {
+            $formats = 'xml,csv,gift';
+        }
+
         return [
-            'canexport'   => has_capability('block/questionfilter:export', $sysctx),
-            'canpreview'  => isloggedin() && !isguestuser(),
-            'isloggedin'  => isloggedin() && !isguestuser(),
+            'canexport'     => has_capability('block/questionfilter:export', $sysctx),
+            'canpreview'    => isloggedin() && !isguestuser(),
+            'isloggedin'    => isloggedin() && !isguestuser(),
+            'exportformats' => $formats,
         ];
     }
 
@@ -947,9 +1061,10 @@ class block_questionfilter_external extends external_api {
      */
     public static function check_capabilities_returns(): external_single_structure {
         return new external_single_structure([
-            'canexport'  => new external_value(PARAM_BOOL),
-            'canpreview' => new external_value(PARAM_BOOL),
-            'isloggedin' => new external_value(PARAM_BOOL),
+            'canexport'     => new external_value(PARAM_BOOL),
+            'canpreview'    => new external_value(PARAM_BOOL),
+            'isloggedin'    => new external_value(PARAM_BOOL),
+            'exportformats' => new external_value(PARAM_TEXT, 'Kommagetrennte Export-Formate', VALUE_DEFAULT, 'xml,csv,gift'),
         ]);
     }
 
@@ -997,7 +1112,9 @@ class block_questionfilter_external extends external_api {
             'contextid'   => $contextid,
         ]);
 
-        $context = context::instance_by_id($params['contextid']);
+        $context = $params['contextid'] > 0
+            ? context::instance_by_id($params['contextid'], IGNORE_MISSING) ?? context_system::instance()
+            : context_system::instance();
         self::validate_context($context);
 
         if (!has_capability('block/questionfilter:view', context_system::instance())) {
@@ -1111,7 +1228,9 @@ class block_questionfilter_external extends external_api {
             'contextid'   => $contextid,
         ]);
 
-        $context = context::instance_by_id($params['contextid']);
+        $context = $params['contextid'] > 0
+            ? context::instance_by_id($params['contextid'], IGNORE_MISSING) ?? context_system::instance()
+            : context_system::instance();
         self::validate_context($context);
 
         if (!has_capability('block/questionfilter:view', context_system::instance())) {
@@ -1266,7 +1385,9 @@ class block_questionfilter_external extends external_api {
             'contextid'  => $contextid,
         ]);
 
-        $context = context::instance_by_id($params['contextid']);
+        $context = $params['contextid'] > 0
+            ? context::instance_by_id($params['contextid'], IGNORE_MISSING) ?? context_system::instance()
+            : context_system::instance();
         self::validate_context($context);
 
         if (!has_capability('block/questionfilter:view', context_system::instance())) {

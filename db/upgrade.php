@@ -90,5 +90,24 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
         upgrade_block_savepoint(true, 2026090524, 'questionfilter');
     }
 
+    // Build 2026101101: KI-Tag-Vorschlagstabelle anlegen.
+    if ($oldversion < 2026101101) {
+        $table = new xmldb_table('block_questionfilter_tag_pending');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, XMLDB_SEQUENCE);
+            $table->add_field('questionid', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL);
+            $table->add_field('tags', XMLDB_TYPE_TEXT, null, null);
+            $table->add_field('status', XMLDB_TYPE_CHAR, '10', XMLDB_NOTNULL);
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL);
+            $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL);
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_key('fk_question', XMLDB_KEY_FOREIGN, ['questionid'], 'question', ['id']);
+            $table->add_index('idx_questionid', XMLDB_INDEX_UNIQUE, ['questionid']);
+            $table->add_index('idx_status', XMLDB_INDEX_NOTUNIQUE, ['status']);
+            $dbman->create_table($table);
+        }
+        upgrade_block_savepoint(true, 2026101101, 'questionfilter');
+    }
+
     return true;
 }

@@ -118,4 +118,33 @@ if ($ADMIN->fulltree) {
         '200',
         PARAM_INT
     ));
+
+    // KI-Verschlagwortung.
+    $settings->add(new admin_setting_heading(
+        'block_questionfilter/ai_heading',
+        get_string('settings_ai_heading', 'block_questionfilter'),
+        get_string('settings_ai_desc', 'block_questionfilter')
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'block_questionfilter/ai_enabled',
+        get_string('settings_ai_enabled', 'block_questionfilter'),
+        get_string('settings_ai_enabled_help', 'block_questionfilter'),
+        0
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'block_questionfilter/ai_autoapply',
+        get_string('settings_ai_autoapply', 'block_questionfilter'),
+        get_string('settings_ai_autoapply_help', 'block_questionfilter'),
+        0
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_questionfilter/ai_batch_size',
+        get_string('settings_ai_batch_size', 'block_questionfilter'),
+        get_string('settings_ai_batch_size_help', 'block_questionfilter'),
+        '20',
+        PARAM_INT
+    ));
 }
