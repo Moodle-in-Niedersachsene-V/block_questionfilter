@@ -1,6 +1,25 @@
 {{!
     @template block_questionfilter/block
-    Fragebank-Filter-Block
+
+    Fragebank-Filter-Block.
+
+    Classes required for JS:
+    * none
+
+    Data attributes required for JS:
+    * data-blockid
+
+    Context variables required for this template:
+    * blockid (int) - ID der Blockinstanz.
+    * difficulties (array of strings) - Niveaustufen.
+    * scope_all (bool) - Ob der Suchbereich 'all' ist.
+
+    Example context (json):
+    {
+        "blockid": 1,
+        "difficulties": ["Leicht", "Mittel", "Schwer"],
+        "scope_all": true
+    }
 }}
 <div class="qf-block" data-blockid="{{blockid}}" id="qf-block-{{blockid}}">
 

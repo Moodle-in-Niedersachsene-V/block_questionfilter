@@ -39,11 +39,11 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         this.selected = {};
         this.results = [];
         this.allCats = [];
-        this.loadedQtypes = []; // [{key, label}] — dynamisch aus DB
+        this.loadedQtypes = []; // [{key, label}] — dynamisch aus DB.
         this.panelOpen = false;
         this.panelQuery = '';
         this.debounce = null;
-        this.ratings = {}; // {qid: {average, count, myrating}}
+        this.ratings = {}; // {qid: {average, count, myrating}}.
         this.sessionHash = getSessionHash();
     }
 
@@ -205,18 +205,22 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         // Export-Buttons korrekt angezeigt werden ohne Seiten-Reload.
         self.refreshCapabilities();
 
-        // postMessage-Listener: Pool-Login-Tab sendet 'qf_pool_login_done'
-        // wenn der Pool-Nutzer eingeloggt wurde. Dann refreshCapabilities()
-        // erneut aufrufen damit Export-Buttons ohne Seiten-Reload erscheinen.
+        self.initPoolLoginListener();
+        self.restoreSelectionAfterReload();
+    };
+
+    /**
+     * Registriert den postMessage-Listener fuer Pool-Login-Benachrichtigungen.
+     * Pool-Login-Tab sendet 'qf_pool_login_done' nach erfolgreichem Login.
+     */
+    BlockState.prototype.initPoolLoginListener = function() {
+        var self = this;
         var wwwroot = self.config.wwwroot || M.cfg.wwwroot;
         window.addEventListener('message', function(event) {
-            // Origin prüfen – nur Nachrichten vom eigenen Moodle akzeptieren.
             if (event.origin !== new URL(wwwroot).origin) {
                 return;
             }
             if (event.data && event.data.type === 'qf_pool_login_done') {
-                // Auswahl vor dem Reload in sessionStorage sichern,
-                // damit sie nach dem Reload wiederhergestellt werden kann.
                 try {
                     sessionStorage.setItem(
                         'qf_restore_selection_' + self.blockid,
@@ -229,14 +233,17 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
                             tags: self.tags,
                         })
                     );
-                } catch (e) { /* ignore */ }
-                // Session-Cookie hat sich geändert (Pool-Nutzer eingeloggt).
-                // Seite neu laden damit Moodle-Session und AJAX-Token übereinstimmen.
+                } catch (e) { /* Ignore storage errors. */ }
                 window.location.reload();
             }
         });
+    };
 
-        // Auswahl + Suchzustand nach Pool-Login-Reload wiederherstellen.
+    /**
+     * Stellt Auswahl und Suchzustand nach Pool-Login-Reload wieder her.
+     */
+    BlockState.prototype.restoreSelectionAfterReload = function() {
+        var self = this;
         try {
             var restoreKey = 'qf_restore_selection_' + self.blockid;
             var stored = sessionStorage.getItem(restoreKey);
@@ -244,23 +251,19 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
                 sessionStorage.removeItem(restoreKey);
                 var snap = JSON.parse(stored);
                 if (snap && Array.isArray(snap.ids) && snap.ids.length) {
-                    // Suchzustand wiederherstellen.
                     self.search = snap.search || '';
-                    self.cats   = snap.cats   || {};
-                    self.types  = snap.types  || {};
-                    self.diffs  = snap.diffs  || {};
-                    self.tags   = snap.tags   || [];
-                    // IDs sofort in selected setzen damit updateFooter
-                    // die Export-Buttons sofort aktiviert.
+                    self.cats = snap.cats || {};
+                    self.types = snap.types || {};
+                    self.diffs = snap.diffs || {};
+                    self.tags = snap.tags || [];
                     snap.ids.forEach(function(id) {
                         self.selected[String(id)] = true;
                     });
                     self.updateFooter();
-                    // Suche mit wiederhergestellten Parametern auslösen.
                     self.triggerSearch();
                 }
             }
-        } catch (e) { /* ignore */ }
+        } catch (e) { /* Ignore storage errors. */ }
     };
 
     /**
@@ -275,9 +278,11 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
             done: function(result) {
                 self.config.canexport = result.canexport;
                 self.config.isloggedin = result.isloggedin;
-                // Export-Formate vom Server verwenden (korrekt aufgeloest).
+                // Export-Formate vom Server verwenden (korrekt aufgelöst).
                 var fmtStr = result.exportformats || self.config.exportformats || 'xml,csv,gift';
-                var formats = fmtStr.split(',').map(function(s) {return s.trim();});
+                var formats = fmtStr.split(',').map(function(s) {
+                    return s.trim();
+                });
                 // Export-Buttons einblenden wenn Capability vorhanden.
                 self.block().querySelectorAll('.qf-export').forEach(function(btn) {
                     var fmt = btn.dataset.format;
@@ -841,9 +846,9 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
             fail: Notification.exception,
         }]);
     };
-    // addToQuiz: vorerst deaktiviert — Pool-Nutzer haben keine Test-Bearbeitungsrechte.
+    // AddToQuiz: vorerst deaktiviert — Pool-Nutzer haben keine Test-Bearbeitungsrechte.
     // Reaktivieren sobald ein konkreter Quiz-Kontext (Kurs + Quiz-ID) bekannt ist.
-    BlockState.prototype.addToQuiz = function() { /* noop */ };
+    BlockState.prototype.addToQuiz = function() { /* Noop — reserved for future use. */ };
 
     /**
      * Session-Hash fuer Gast-Bewertungen — einmalig pro Sitzung erzeugen.
