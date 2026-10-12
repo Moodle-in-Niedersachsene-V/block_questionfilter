@@ -228,17 +228,11 @@ class ai_connector {
 
         // Convert "Name: value" header strings to the associative array
         // format expected by \curl::setHeader().
-        $headermap = [];
-        foreach ($headers as $h) {
-            $parts = explode(': ', $h, 2);
-            if (count($parts) === 2) {
-                $headermap[$parts[0]] = $parts[1];
-            }
-        }
-
         $curl = new \curl(['ignoresecurity' => false]);
-        $curl->setHeader($headermap);
-        $curl->setopt(['CURLOPT_TIMEOUT' => $timeout]);
+        $curl->setopt([
+            'CURLOPT_TIMEOUT'    => $timeout,
+            'CURLOPT_HTTPHEADER' => $headers,
+        ]);
 
         // Passing a string to post() sets CURLOPT_POSTFIELDS directly,
         // preserving the raw JSON body and the Content-Type header we set above.

@@ -24,6 +24,70 @@
  */
 
 /**
+ * Called by Moodle after config.php is loaded (every request).
+ *
+ * Delegates pool-user restrictions entirely to block_kursfilter when that
+ * plugin is installed (it already handles messaging suppression and URL
+ * redirects for pool users). If block_kursfilter is not present, this
+ * callback applies the same guards independently so pool users cannot reach
+ * profile, preferences, messaging or similar pages even when only
+ * block_questionfilter is installed.
+ */
+function block_questionfilter_after_config(): void {
+    global $CFG, $USER;
+
+    // Only act on real pool users.
+    if (!isloggedin() || isguestuser()) {
+        return;
+    }
+
+    // If block_kursfilter is installed its own after_config already ran;
+    // Its is_pool_user() check covers the same accounts, so avoid duplicate work.
+    if (class_exists('\block_kursfilter\pool_manager')) {
+        // Block_kursfilter handles everything — nothing to do here.
+        return;
+    }
+
+    // Standalone guard: mirror block_kursfilter logic using the shared username prefix.
+    $prefix = 'kursfilter_guest';
+    if (empty($USER->username) || strpos($USER->username, $prefix) !== 0) {
+        return;
+    }
+
+    // Suppress messaging icon for this session.
+    $CFG->messaging = false;
+
+    // Redirect blocked paths to site home.
+    $blockedprefixes = [
+        '/user/profile.php',
+        '/user/edit.php',
+        '/user/preferences.php',
+        '/user/managefiles.php',
+        '/message/',
+        '/calendar/',
+        '/grade/report/overview/',
+        '/grade/report/user/',
+        '/badges/',
+        '/blog/',
+        '/my/',
+        '/user/files.php',
+    ];
+
+    $script = isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '';
+    $wwwroot = rtrim(parse_url($CFG->wwwroot, PHP_URL_PATH) ?? '', '/');
+    if ($wwwroot !== '' && strpos($script, $wwwroot) === 0) {
+        $script = substr($script, strlen($wwwroot));
+    }
+
+    foreach ($blockedprefixes as $prefix) {
+        if (strpos($script, $prefix) === 0) {
+            header('Location: ' . $CFG->wwwroot . '/');
+            exit;
+        }
+    }
+}
+
+/**
  * Datei-Download-Handler fuer Export-Dateien.
  *
  * Wird von Moodle automatisch aufgerufen bei
