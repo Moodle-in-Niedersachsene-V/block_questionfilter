@@ -2,7 +2,7 @@
 # GitHub Actions Workflow fuer Moodle-Plugin-Pruefung
 # Moodle in Niedersachsen e. V.
 #
-# Plugin: block_questionfilter
+# Plugin: block_fragenfilter
 # Ablage: .github/workflows/moodle-ci.yml
 #
 # Angepasst: kein tests/ vorhanden, daher ohne phpunit- und behat-Schritt.
@@ -128,5 +128,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: amd-build-${{ matrix.php }}
-          path: moodle/public/blocks/questionfilter/amd/build/
+          path: moodle/public/blocks/fragenfilter/amd/build/
           if-no-files-found: warn
