@@ -62,3 +62,45 @@ Der lokale Nachweis für das Testgerüst wurde unter `/tmp/questionfilter-spec2-
 
 - Änderungen an `amd/src/` brauchen einen Grunt-Build (`amd/build/`).
 - Nach Änderungen an `db/access.php`, `db/services.php`, `db/install.xml` oder `version.php` Moodle-Upgrade ausführen.
+
+## Semgrep
+
+Der eigenständige CI-Job `semgrep` verwendet den unveränderten
+[Vereinsregelsatz samt Herkunft und Hash](../../.github/semgrep/README.md).
+Im Repo-Root mit Docker denselben blockierenden Lauf starten:
+
+```bash
+docker run --rm --network none -v "$PWD:/src:ro" -w /src \
+  semgrep/semgrep@sha256:93963d9295a366f59e4850127b1550400ee7b388f04fe144e4a1f6325d96e01b \
+  semgrep scan --config .github/semgrep/moodle-security.yml \
+  --severity ERROR --error --strict --metrics=off --disable-version-check \
+  --no-rewrite-rule-ids .
+```
+
+Das Image muss vorher vorhanden sein (`docker pull` mit demselben Digest).
+Semgrep 1.179.0 liefert bei ERROR-Treffern Exit 1, bei keinem ERROR Exit 0;
+`--strict` lässt auch Scan-/Regelfehler scheitern. WARNING und INFO blockieren
+nicht. Für die fachliche Bewertung aller Schweregrade `--severity ERROR --error`
+weglassen; dieser Bericht liefert auch bei Treffern Exit 0 und ist kein Gate.
+Bei Bedarf `--json --output /tmp/questionfilter-semgrep.json` ergänzen.
+`.semgrepignore` enthält bewusst keine Ausschlüsse, damit auch Test-PHP-Dateien
+geprüft werden; einzelne Regeln haben eigene, unverändert übernommene Pfadgrenzen.
+Begründete Ausnahmen stehen nur am betroffenen Fund als `nosemgrep: <Regel-ID>`
+mit konkreter Begründung (A2). Bekannte echte Lücken dürfen so nicht ausgeblendet
+werden. Der [Fallplan](../fallplan.md) bewertet die tatsächlichen Treffer.
+
+Die Gate-Proben zu #7 liegen unter `/tmp/questionfilter-spec2-issue7/fixtures/`:
+`unsafe.php` enthält Superglobal-Zugriff und `eval` (ERROR, Gate-Exit 1),
+`safe.php` nutzt typisierte Parameter, gebundenes SQL und `s()` (Exit 0),
+`advisory.php` enthält `md5` und einen ungeprüften `html_writer`-Inhalt
+(WARNING/INFO im Vollbericht, Gate-Exit 0). `gate-checks.py` dort führt diese
+Scans und den Plugin-Scan mit JSON-Bericht, Logs und getrennten Exitdateien aus.
+Die Fixtures werden nur gescannt, nie als PHP ausgeführt. Sie prüfen Auswahl und
+Exitverhalten des Gates, keine vollständige Wirksamkeit aller 23 Regeln.
+
+Der zusätzliche HTTP-Test
+`request_test::test_preview_rejects_get_and_invalid_sesskeys_before_logging_in`
+prüft GET ohne, mit falschem und mit gültigem Sesskey sowie POST ohne/mit falschem Sesskey: keine
+Pool-Anmeldung und unveränderte Nutzer-, Fragen-, Bewertungs- und Tag-Daten.
+Der Gegenfall POST mit gültigem Sesskey startet die Vorschau und meldet das
+Pool-Konto an. Pool-Belegung und Fragen-Sichtbarkeit bleiben eigene Fälle (#8/#9).

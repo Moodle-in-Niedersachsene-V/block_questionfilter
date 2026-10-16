@@ -5,8 +5,8 @@
 | Kopf | Wert |
 | --- | --- |
 | Projekt / Komponenten | Materialien-Hub: `block_questionfilter` mit `block_kursfilter` |
-| Planversion / Prüfdatum | 1 / 16.10.2026; initialer Plan zu [#6](https://github.com/Moodle-in-Niedersachsene-V/block_questionfilter/issues/6), Teil [Spec #2](https://github.com/Moodle-in-Niedersachsene-V/block_questionfilter/issues/2) |
-| Geprüfter Commit | `a4943ea3765c2d49854d116fc368675362f5556e` auf `coding-standards`; nachfolgende Dokumentationsänderungen sind kein neuer Verhaltensnachweis |
+| Planversion / Prüfdatum | 1 / 16.10.2026; ergänzt um Semgrep und Vorschau-CSRF zu #7; initialer Plan zu [#6](https://github.com/Moodle-in-Niedersachsene-V/block_questionfilter/issues/6), Teil [Spec #2](https://github.com/Moodle-in-Niedersachsene-V/block_questionfilter/issues/2) |
+| Geprüfter Commit | E1–E4/R1–R3: `a4943ea3765c2d49854d116fc368675362f5556e`; S1/S2: #7-Änderung ab `1eef8035fa4a187b53e716440210a99b674e9d3c`, genaue geprüfte Dateihashes in `/tmp/questionfilter-spec2-issue7/source-hashes.json`. Kein neuer CI-/Release-Nachweis für #7 bis zur Abnahme. |
 | Build im Quellstand | `2026101602`, Release `v1.3.10` laut `version.php`; noch kein festgelegter Release-Build für Spec #2 |
 | Zugeordnetes Paket | **Nicht vorhanden / nicht geprüft.** Erst #13 erstellt `block_questionfilter_<build>.zip` aus dem geprüften Release-Commit und belegt die Paketinstallation. |
 | Unterstützte Versionen / Auswahl | `requires = 2025100600` (Moodle 5.1); vereinbarte Matrix 5.1/PHP 8.3/MariaDB 10.11 und 5.2/PHP 8.4/PostgreSQL 16. Nur Materialien-Hub, keine vollständige DB-Kreuzmatrix ([ADR 0001](adr/0001-fragenfilter-runs-only-in-the-materials-hub.md)). |
@@ -31,6 +31,49 @@ Das historische Kursfilter-[Prüfprotokoll](https://github.com/Moodle-in-Nieders
 | R2 | Review am geprüften Commit: [`amd/src/filter.js`](https://github.com/Moodle-in-Niedersachsene-V/block_questionfilter/blob/a4943ea3765c2d49854d116fc368675362f5556e/amd/src/filter.js) erzeugt `sessionHash` mit `Math.random`/`sessionStorage`; [`classes/external.php`](https://github.com/Moodle-in-Niedersachsene-V/block_questionfilter/blob/a4943ea3765c2d49854d116fc368675362f5556e/classes/external.php) nimmt `sessionhash` an und ordnet Bewertungen darüber bzw. über `userid` zu. Kein Nachweis des ADR-0003-Cookie-Vertrags. |
 | R3 | Review am geprüften Commit: [`classes/privacy/provider.php`](https://github.com/Moodle-in-Niedersachsene-V/block_questionfilter/blob/a4943ea3765c2d49854d116fc368675362f5556e/classes/privacy/provider.php) implementiert `null_provider`; [`db/install.xml`](https://github.com/Moodle-in-Niedersachsene-V/block_questionfilter/blob/a4943ea3765c2d49854d116fc368675362f5556e/db/install.xml) speichert `userid`/`sessionhash` und Zeitstempel. Metadatenaussage widerspricht personenbezogener Speicherung. |
 
+### Ergänzende Nachweise zu #7
+
+- **S1 – Scanner/Gate (16.10.2026):** unveränderte 23 Vereinsregeln, Quellen-Commit
+  `37b1702d79bb5eb8d01abfc286a1ae88060123a3`, Herkunft/Hash in
+  [`.github/semgrep/README.md`](../.github/semgrep/README.md). Semgrep 1.179.0,
+  fixierter Image-Digest. Vollständiger Erstlauf ohne den alten Dateiausschluss:
+  23 PHP-Dateien, **1 ERROR / 4 WARNING / 0 INFO**, keine Scanfehler.
+  Der frühere Lauf mit altem `.semgrepignore` erfasste nur 22 Dateien und ist
+  ausdrücklich kein vollständiger Erstlauf. Der Lauf ohne `.semgrepignore`
+  ließ zusätzlich Tests durch Scanner-Defaults aus; maßgeblich ist
+  `first-complete.json` mit ausschlussfreier `.semgrepignore`.
+  Gate-Proben: unsicher (`$_GET`, `eval`) Exit 1; sicher (typisierter Parameter,
+  SQL-Bindung, maskierte Ausgabe) Exit 0; reine WARNING/INFO im Vollbericht
+  erkannt, beim ERROR-Gate Exit 0. Keine PHP-Ausführung dieser Fixtures.
+  Vollscan nach Änderung: **0 ERROR / 6 WARNING / 0 INFO**, keine Scanfehler;
+  ERROR-Gate lokal Exit 0. Das prüft Gate-Auswahl und Exitverhalten, nicht jede
+  Wirksamkeitsgrenze aller Regeln. Der neue CI-Job ist bis zur CI-Abnahme offen.
+- **S2 – HTTP-Verhalten:**
+  `request_test::test_preview_rejects_get_and_invalid_sesskeys_before_logging_in`
+  gegen echte isolierte Testwebserver: GET ohne/falschen/gültigen Sesskey sowie
+  POST ohne/falschen Sesskey werden ohne Pool-Anmeldung und ohne Änderung der
+  geprüften Nutzer-, Fragen-, Bewertungs- und Tag-Daten abgewiesen. Gegenfall:
+  gültiger POST meldet das vorhandene Pool-Konto an und liefert das Vorschauziel.
+  Der rote Test vor der Änderung belegt die bisherige GET-Anmeldung.
+  Lokale Moodle-Stände: 5.1.7+ (Build 20260928)/PHP 8.3.35 und
+  5.2.4 (Build 20261005)/PHP 8.4.25, jeweils PostgreSQL 16.14.
+  Vollsuite mit `moodle-plugin-ci phpunit --fail-on-warning`: jeweils
+  **4 Tests / 77 Assertions**, Exit 0. Belege in `suite51-final.log`/`suite52-final.log`; keine MariaDB-Abnahme
+  aus diesen lokalen PostgreSQL-Läufen ableiten. Keine Pool-Belegungs- oder
+  allgemeine Sichtbarkeitsprüfung.
+
+| Fund / geprüfter Ort | Fachliche Bewertung / Maßnahme / Grenze |
+| --- | --- |
+| ERROR `moodle-einstiegsdatei-ohne-login`, `guest_preview.php` (Erstlauf Zeile 31) | Öffentlicher Login-Einstieg nach ADR 0002 braucht selbst kein `require_login`. Der ungeschützte Login war trotzdem ein echter CSRF-Befund: in #7 minimal durch POST-/Sesskey-Prüfung **vor** Fragenzugriff/Pool-Auswahl abgesichert und per S2 nachgewiesen. Erst danach regelgenaue `nosemgrep`-Ausnahme mit Begründung direkt am Einstieg; keine Dateiausnahme mehr. Die weiterhin eigene Pool-Auswahl bleibt FEHLER B2-04/#8; keine Unterdrückung eines Pool-Belegungschecks (der Regelsatz hat keinen solchen Check). |
+| WARNING `moodle-echo-unescaped`, `guest_preview.php`: `$wwwrootjson`, `$previewurljson` (Erstlauf Zeilen 114/119) | Kein ungefilterter Nutzertext: `json_encode` kodiert die Betreiberkonfiguration `wwwroot` und die aus dieser Konfiguration sowie typisiertem Integer-`qid` aufgebaute Core-URL für JS. Am geprüften Datenfluss kein bestätigter XSS-Befund; keine Unterdrückung. Allgemeine Ausgabe-/Sichtbarkeitsprüfungen B4-02/B2-03 bleiben offen. |
+| WARNING `moodle-curl-statt-moodle-curl`, `tests/request_test.php`: `ajax()` und neues `preview_request()` (je `curl_init`/`curl_exec`) | Erstlauf zwei, danach vier Treffer: ausschließlich Testadapter gegen die explizite isolierte `QUESTIONFILTER_WEB_URL`. Native cURL hält den echten HTTP-Aufruf vom PHPUnit-Prozess getrennt; kein Produktivrequest und keine Nutzerziel-URL. Keine Ausnahme nötig, WARNING blockiert nicht. Produktiver KI-Connector nutzt Moodle-`\curl`; NW-01–03 bleiben offen und werden durch diesen Testbefund nicht freigegeben. |
+| INFO | Erst- und Plugin-Folgelauf ohne INFO-Treffer. Gate-Probe `html_writer::div($content)` liefert INFO; sie belegt, dass INFO im Vollbericht sichtbar ist und das ERROR-Gate nicht blockiert. Keine allgemeine Maskierungsfreigabe daraus. |
+
+Alle #7-Logs, Exitdateien, JSON-Berichte, unveränderter Quellensnapshot,
+Fixture-Quellen und Review-/Übergabekontext: `/tmp/questionfilter-spec2-issue7/`.
+S1/S2 ändern keine historischen E1–E4-Laufgrenzen. Für die neue Vorschauänderung
+ist die lokale S2-Prüfung maßgeblich; die CI-Matrix am finalen #7-SHA steht aus.
+
 Arbeitsbelege dieser Planerstellung: `/tmp/questionfilter-spec2-issue6/` (Quellensnapshots, CI-JSON/Log, Reviews, mechanische Prüfung, Übergabe).
 Die älteren lokalen #5-Belege unter `/tmp/questionfilter-spec2-issue5/` sind Entwicklungsnachweise früherer Commits; insbesondere `suite-reviewed.log` mit 2 Tests/22 Assertions ersetzt E1 nicht.
 
@@ -51,7 +94,7 @@ Jede Zeile ist ein Fall; enthält sie mehrere Varianten, müssen alle belegt sei
 | B1-02 / B1, Migration | Upgrade von Vor-Spec-Stand: Rollenzuweisung für bestehende und später angelegte Pool-Konten; Bewertungsschema umgestellt. Gegenfall: leerer Bestand; bei Altbestand Sterne erhalten, alte Kennungen verworfen; kein Verlust fremder Daten. | offen | — | Nachweis fehlt; #8/#10. Live-Bestand vor Upgrade prüfen, kein Hub-Zugriff in dieser Prüfung. |
 | B1-03 / B1 | Developer Debugging, abweichender Tabellenpräfix, zentrale Hub-Funktionen Suche/Filter/Vorschau/Export/Bewertung/Tag-Prüfung ohne neue Debugmeldungen oder Regressionen. | offen | — | Vollständiger Funktionsnachweis fehlt; E1 deckt nur Tracer ab. #8–#12, Endabnahme #13. |
 | B1-04 / B1, Release | Finaler Commit, Metadaten/Abhängigkeiten, Build `YYYYMMDDNN`, Maintainer und Paket `block_questionfilter_<build>.zip` stimmen überein; Paket sauber installierbar; vereinbarte Checks am Release-Stand grün. | offen | — | Paket noch nicht vorhanden; einziger Paketinstallationsfall, #13. Nach Codeänderung erneut prüfen. |
-| B1-05 / ergänzendes Werkzeug | Vereins-Semgrep-Regeln mit Herkunft, unsicheren Treffern und sicheren Gegenfällen; ERROR blockiert, WARNING/INFO fachlich bewertet. | offen | — | Noch nicht untersucht/kein Laufnachweis; #7. Kein allgemeiner Ersatz für Verhaltenstests. |
+| B1-05 / ergänzendes Werkzeug | Vereins-Semgrep-Regeln mit Herkunft, unsicheren Treffern und sicheren Gegenfällen; ERROR blockiert, WARNING/INFO fachlich bewertet. | offen | Automatisierte Gate-Proben und Review / S1 | Lokal geprüft und ausgewertet; CI-Abnahme des neuen ERROR-Jobs am finalen #7-SHA fehlt. Kein allgemeiner Ersatz für Verhaltenstests. |
 
 ### B2 – Anmeldung und Berechtigungen (ADR 0002)
 
@@ -71,7 +114,7 @@ Jede Zeile ist ein Fall; enthält sie mehrere Varianten, müssen alle belegt sei
 
 | Fall-ID / Bereich | Konkreter Fall und erwartetes Ergebnis | Status | Belegart / Quelle | Befund oder N/A-Begründung / Folgeticket |
 | --- | --- | --- | --- | --- |
-| B3-01 / B3 | Vorschau-Start über GET oder POST ohne/mit ungültigem Sesskey abgewiesen, ohne Anmeldung/Belegungsänderung; Gegenfall POST mit gültigem Sesskey startet zulässige Vorschau. | FEHLER | Review / R1, ADR 0002 | Login-CSRF: GET bewirkt Anmeldung; Behebung #8. Daten-/Sessionvergleich und positiver Request-Nachweis fehlen. |
+| B3-01 / B3 | Vorschau-Start über GET oder POST ohne/mit ungültigem Sesskey abgewiesen, ohne Anmeldung/Belegungsänderung; Gegenfall POST mit gültigem Sesskey startet zulässige Vorschau. | OK | Automatisierter HTTP-Test / S2; historisch R1 | Login-CSRF in #7 durch POST und Sesskey behoben, negative Fälle mit unveränderten Daten/ohne Pool-Anmeldung und gültiger Gegenfall lokal belegt. CI am #7-SHA steht aus. Pool-Belegung bleibt separat B2-04/#8. |
 | B3-02 / B3 | Bewertung ohne/mit ungültigem Sesskey oder unzulässiger Methode speichert nichts; Gegenfall gültiger schreibender AJAX-Aufruf bewertet erlaubte Frage mit 1–5 Sternen. | offen | — | Nachweis fehlt; #10, höchstens eine Bewertung nach PD-02. Ablehnung einschließlich unveränderter Tabellen belegen. |
 | B3-03 / B2, B3, KI | Prüfseite ohne `reviewtags`, mit fremder Vorschlags-/Fragen-ID oder Aktion ohne/mit ungültigem Sesskey abgewiesen ohne Änderungen; Gegenfall berechtigtes Annehmen/Verwerfen per POST mit Sesskey wirkt nur auf erlaubte Vorschläge. | offen | — | Noch nicht untersucht; #12. Rechte beim Anzeigen und Ausführen prüfen, Tag-/Pending-Datensätze vergleichen. |
 
@@ -128,16 +171,16 @@ Jede Zeile ist ein Fall; enthält sie mehrere Varianten, müssen alle belegt sei
 
 ## Fortschritt und Freigabe
 
-Planversion 1, Commit `a4943ea3765c2d49854d116fc368675362f5556e`:
+Planversion 1, historische E1–E4-Grenze und lokale #7-Nachweise S1/S2 gemäß Prüfkopf:
 
 - Festgelegt: **43 Fälle**, davon **4 ENTFÄLLT**, also **39 anwendbar**.
-- Status anwendbar: **4 OK, 4 FEHLER, 31 offen, 0 HINWEIS**.
-- Prüfplan-Fortschritt: **4 / 39 = 10,26 %** erfolgreich belegt (B1-01, B2-01, B2-09, EX-01).
-- Automatisiert erfolgreich geprüft: **4 / 39 = 10,26 %** (dieselben Fälle, E1–E4). Ein Lauf kann mehrere Fälle belegen; keine Zählung pro Assertion oder Matrixjob.
-- Code-Liniencoverage: **nicht erhoben**; aus 3 Tests/31 Assertions nicht ableitbar.
+- Status anwendbar: **5 OK, 3 FEHLER, 31 offen, 0 HINWEIS**.
+- Prüfplan-Fortschritt: **5 / 39 = 12,82 %** erfolgreich belegt (B1-01, B2-01, B2-09, B3-01, EX-01).
+- Automatisiert erfolgreich geprüft: **5 / 39 = 12,82 %** (dieselben Fälle, E1–E4 und S2). Ein Lauf kann mehrere Fälle belegen; keine Zählung pro Assertion oder Matrixjob.
+- Code-Liniencoverage: **nicht erhoben**; aus PHPUnit-Assertions nicht ableitbar.
 
-**Keine Freigabe.** Vier FEHLER und offene Prüffälle verhindern die Freigabe nach Spec #2; Paketinstallation und Freigabeverantwortung fehlen.
-Die FEHLER B2-04/B3-01 verantwortet #8, PD-01 #10, PD-05 #11; Termine sind noch nicht festgelegt.
+**Keine Freigabe.** Drei FEHLER und offene Prüffälle verhindern die Freigabe nach Spec #2; Paketinstallation und Freigabeverantwortung fehlen.
+Den FEHLER B2-04 verantwortet #8, PD-01 #10, PD-05 #11; Termine sind noch nicht festgelegt.
 Weitere offene Fälle sind je Zeile den Folgetickets zugeordnet. #13 hält den abschließenden Freigabeentscheid samt verantwortlicher Person fest.
 
 Bei **jedem Folgeticket der Spec #2** die betroffenen Fälle in derselben Änderung aktualisieren:

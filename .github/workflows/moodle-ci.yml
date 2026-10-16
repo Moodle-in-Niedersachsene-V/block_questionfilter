@@ -19,6 +19,19 @@ on:
   workflow_dispatch:
 
 jobs:
+  semgrep:
+    runs-on: ubuntu-22.04
+    container:
+      # Semgrep 1.179.0; immutable image used by the documented local scan.
+      image: semgrep/semgrep@sha256:93963d9295a366f59e4850127b1550400ee7b388f04fe144e4a1f6325d96e01b
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep (ERROR blocks)
+        run: >-
+          semgrep scan --config .github/semgrep/moodle-security.yml
+          --severity ERROR --error --strict --metrics=off --disable-version-check
+          --no-rewrite-rule-ids .
+
   test:
     runs-on: ubuntu-22.04
 

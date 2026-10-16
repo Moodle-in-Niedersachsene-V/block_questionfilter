@@ -32,6 +32,9 @@ final class request_test extends \advanced_testcase {
     /** @var string Test web server URL. */
     private string $baseurl = '';
 
+    /** @var string Cookie file for preview requests. */
+    private string $cookiejar = '';
+
     /** @var bool Whether Moodle's test setup ran. */
     private bool $setupdone = false;
 
@@ -51,6 +54,9 @@ final class request_test extends \advanced_testcase {
     protected function tearDown(): void {
         if (!$this->setupdone) {
             return;
+        }
+        if ($this->cookiejar !== '') {
+            unlink($this->cookiejar);
         }
         // HTTP writes bypass PHPUnit's change tracking, requiring a full reset.
         \testing_util::$tableupdated = [];
@@ -84,6 +90,83 @@ final class request_test extends \advanced_testcase {
         $response = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
         $this->assertArrayHasKey(0, $response, $body);
         return $response;
+    }
+
+    /**
+     * Calls the preview endpoint with the same visitor session.
+     *
+     * @param array $fields Query or form fields.
+     * @param bool $post Whether to submit a POST.
+     * @param string $path Endpoint path.
+     * @return string Response body.
+     */
+    private function preview_request(array $fields, bool $post, string $path = '/blocks/questionfilter/guest_preview.php'): string {
+        $this->preventResetByRollback();
+        if ($this->cookiejar === '') {
+            $this->cookiejar = tempnam(sys_get_temp_dir(), 'qfjar');
+        }
+        $url = $this->baseurl . $path;
+        if (!$post && $fields) {
+            $url .= '?' . http_build_query($fields, '', '&');
+        }
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_COOKIEFILE => $this->cookiejar,
+            CURLOPT_COOKIEJAR => $this->cookiejar,
+            CURLOPT_TIMEOUT => 30,
+        ]);
+        if ($post) {
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($fields, '', '&'));
+        }
+        $body = curl_exec($ch);
+        $this->assertNotFalse($body, 'Test web server not reachable: ' . curl_error($ch));
+        curl_close($ch);
+        return $body;
+    }
+
+    public function test_preview_rejects_get_and_invalid_sesskeys_before_logging_in(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category();
+        $question = $generator->create_question('truefalse', null, ['category' => $category->id]);
+        $pooluser = $DB->get_record('user', ['username' => 'kursfilter_pool01'], '*', MUST_EXIST);
+        $loginpage = $this->preview_request([], false, '/login/index.php');
+        $this->assertSame(1, preg_match('/"sesskey":"([A-Za-z0-9]+)"/', $loginpage, $matches));
+        $sesskey = $matches[1];
+        $before = [];
+        foreach (['user', 'question', 'block_questionfilter_ratings', 'block_questionfilter_tag_pending'] as $table) {
+            $before[$table] = $DB->get_records($table, null, 'id');
+        }
+
+        $requests = [
+            [false, ['qid' => $question->id], 'error_preview_needs_post'],
+            [false, ['qid' => $question->id, 'sesskey' => 'wrong12345'], 'error_preview_needs_post'],
+            [false, ['qid' => $question->id, 'sesskey' => $sesskey], 'error_preview_needs_post'],
+            [true, ['qid' => $question->id], 'missingparam'],
+            [true, ['qid' => $question->id, 'sesskey' => 'wrong12345'], 'invalidsesskey'],
+        ];
+        foreach ($requests as [$post, $fields, $error]) {
+            $body = $this->preview_request($fields, $post);
+            $component = $error === 'error_preview_needs_post' ? 'block_questionfilter' : 'error';
+            $this->assertStringContainsString(get_string($error, $component, 'sesskey'), $body, $error);
+            $this->assertStringNotContainsString('qf_pool_login_done', $body);
+            $this->assertSame(0, $DB->count_records('sessions', ['userid' => $pooluser->id]));
+            foreach ($before as $table => $records) {
+                $this->assertEquals($records, $DB->get_records($table, null, 'id'), $table . ' changed.');
+            }
+        }
+
+        $body = $this->preview_request(['qid' => $question->id, 'sesskey' => $sesskey], true);
+        $this->assertStringContainsString('qf_pool_login_done', $body);
+        $this->assertStringContainsString(
+            '/question/bank/previewquestion/preview.php?id=' . $question->id,
+            str_replace('\\/', '/', $body)
+        );
+        $this->assertSame(1, $DB->count_records('sessions', ['userid' => $pooluser->id]));
     }
 
     public function test_anonymous_search_returns_a_visible_question(): void {

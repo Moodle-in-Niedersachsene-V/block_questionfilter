@@ -10,7 +10,7 @@ Reviews zitieren die Regel mit Nummer (`S2`, `N3`, `E4`). Die Regelpräfixe sind
 
 - **Scopes:** `all`, `Moodle` und `AI`: die KI-Verschlagwortung schickt Frageninhalte direkt an einen KI-Anbieter. K-Regeln gelten für Prompt und Auswertung der Antwort (`classes/ai_connector.php`).
 - **Glossar für N1:** [`GLOSSARY.md`](GLOSSARY.md); Begriffe im Code verwenden die Schreibweise der jeweiligen `Code:`-Zeile.
-- **Gate:** Fragenfilter hat kein Coverage-/CRAP-/Mutations-Gate. Die CI (`.github/workflows/moodle-ci.yml`) prüft phpcs, phpdoc, savepoints, mustache und grunt. Regeln, die laut Standard „vom Gate erzwungen“ werden, aber hier von keinem Werkzeug geprüft werden, gelten im Review.
+- **Gate:** Fragenfilter hat kein Coverage-/CRAP-/Mutations-Gate. Die CI (`.github/workflows/moodle-ci.yml`) prüft phpcs, phpdoc, savepoints, mustache und grunt. Der eigenständige Semgrep-Job blockiert zusätzlich bei ERROR-Treffern des versionierten Vereinsregelsatzes; Befundbewertung siehe [Fallplan](docs/fallplan.md). Regeln, die laut Standard „vom Gate erzwungen“ werden, aber hier von keinem Werkzeug geprüft werden, gelten im Review.
 
 ## Abweichungen
 

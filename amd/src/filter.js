@@ -898,12 +898,27 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         if (self.config.isloggedin) {
             // Logged-in user: go directly to the Moodle preview page.
             url = wwwroot + '/question/bank/previewquestion/preview.php?id=' + qid;
-        } else {
-            // Guest: use the pool account login endpoint.
-            url = wwwroot + '/blocks/questionfilter/guest_preview.php?qid=' + qid;
+            window.open(url, 'qf_preview_' + qid, 'width=900,height=700,scrollbars=yes,resizable=yes');
+            return;
         }
 
-        window.open(url, 'qf_preview_' + qid, 'width=900,height=700,scrollbars=yes,resizable=yes');
+        // The public login step requires a session-bound POST.
+        var target = 'qf_preview_' + qid;
+        window.open('', target, 'width=900,height=700,scrollbars=yes,resizable=yes');
+        var form = document.createElement('form');
+        form.method = 'post';
+        form.action = wwwroot + '/blocks/questionfilter/guest_preview.php';
+        form.target = target;
+        [['qid', qid], ['sesskey', M.cfg.sesskey]].forEach(function(field) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = field[0];
+            input.value = field[1];
+            form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit();
+        form.remove();
     };
 
     // ---------------------------------------------------------------

@@ -52,6 +52,7 @@ $string['error_ai_answer_invalid'] = 'KI-Antwort enthält kein gültiges JSON-Ob
 $string['error_ai_request_failed'] = 'KI-Anfrage fehlgeschlagen: {$a}';
 $string['error_ai_tagging_failed'] = 'KI-Verschlagwortung: {$a->failed} von {$a->total} Fragen konnten nicht verarbeitet werden.';
 $string['error_ai_unavailable'] = 'KI-Verschlagwortung ist aktiviert, aber kein KI-Anbieter ist in Moodle konfiguriert (Website-Administration → KI → KI-Anbieter).';
+$string['error_preview_needs_post'] = 'Starte die Vorschau über die Vorschau-Schaltfläche.';
 $string['export_csv'] = 'CSV-Tabelle';
 $string['export_gift'] = 'GIFT-Format';
 $string['export_xml'] = 'Moodle XML';

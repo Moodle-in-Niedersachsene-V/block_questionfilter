@@ -52,6 +52,7 @@ $string['error_ai_answer_invalid'] = 'AI response does not contain a valid JSON 
 $string['error_ai_request_failed'] = 'AI request failed: {$a}';
 $string['error_ai_tagging_failed'] = 'AI tagging: {$a->failed} of {$a->total} questions could not be processed.';
 $string['error_ai_unavailable'] = 'AI tagging is enabled but no AI provider is configured in Moodle (Site administration → AI → AI providers).';
+$string['error_preview_needs_post'] = 'Start the preview using the preview button.';
 $string['export_csv'] = 'CSV spreadsheet';
 $string['export_gift'] = 'GIFT format';
 $string['export_xml'] = 'Moodle XML';

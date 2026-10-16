@@ -21,16 +21,21 @@
  * and shows an intermediate page with links to the preview and home page.
  * No require_login(): this endpoint is intentionally public.
  *
- * Usage: /blocks/questionfilter/guest_preview.php?qid=42
+ * Usage: POST /blocks/questionfilter/guest_preview.php, body qid=42&sesskey=...
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-require_once(__DIR__ . '/../../config.php'); // @codingStandardsIgnoreLine
+// phpcs:ignore moodle.Files.RequireLogin.Missing,moodle.Commenting.InlineComment.NotCapital,moodle.Commenting.InlineComment.InvalidEndChar -- ADR 0002: public pool-login entry; POST and require_sesskey() protect the login. Semgrep uses a fixed marker syntax.
+require_once(__DIR__ . '/../../config.php'); // nosemgrep: moodle-einstiegsdatei-ohne-login
 
 $qid = required_param('qid', PARAM_INT);
+if (!data_submitted()) {
+    throw new moodle_exception('error_preview_needs_post', 'block_questionfilter');
+}
+require_sesskey();
 
 // The question must exist.
 $question = $DB->get_record('question', ['id' => $qid, 'parent' => 0], 'id, name', IGNORE_MISSING);
