@@ -15,25 +15,25 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Privacy provider for block_questionfilter.
+ * Privacy provider for block_fragenfilter.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @author     Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace block_questionfilter\privacy;
+namespace block_fragenfilter\privacy;
 
 /**
- * Privacy provider for block_questionfilter.
+ * Privacy provider for block_fragenfilter.
  *
  * The block does not store personal data itself.
  * Export files are stored temporarily in Moodle's file store
  * and are accessible only to the exporting user.
  * No user data is stored persistently.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Library functions for block_questionfilter.
+ * Library functions for block_fragenfilter.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @author     Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -27,7 +27,7 @@
  * Download handler for export files.
  *
  * Called automatically by Moodle at
- * /pluginfile.php/.../block_questionfilter/export/...
+ * /pluginfile.php/.../block_fragenfilter/export/...
  *
  * @param stdClass $course Course object.
  * @param stdClass $cm Course module object.
@@ -38,7 +38,7 @@
  * @param array $options Additional file serving options.
  * @return void
  */
-function block_questionfilter_pluginfile(
+function block_fragenfilter_pluginfile(
     $course,
     $cm,
     $context,
@@ -62,7 +62,7 @@ function block_questionfilter_pluginfile(
     $filepath = $args ? '/' . implode('/', $args) . '/' : '/';
 
     $fs = get_file_storage();
-    $file = $fs->get_file($context->id, 'block_questionfilter', 'export', $itemid, $filepath, $filename);
+    $file = $fs->get_file($context->id, 'block_fragenfilter', 'export', $itemid, $filepath, $filename);
 
     if (!$file) {
         send_file_not_found();

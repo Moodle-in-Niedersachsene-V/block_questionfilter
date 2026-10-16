@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace block_questionfilter\event;
+namespace block_fragenfilter\event;
 
 /**
  * A reviewer accepted or rejected a tag suggestion.
@@ -25,7 +25,7 @@ namespace block_questionfilter\event;
  *      - string status: New suggestion status, 'applied' or 'rejected'.
  * }
  *
- * @package block_questionfilter
+ * @package block_fragenfilter
  * @copyright 2026 Moodle in Niedersachsen e. V.
  * @license https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -36,7 +36,7 @@ class suggestion_reviewed extends \core\event\base {
     protected function init(): void {
         $this->data['crud'] = 'u';
         $this->data['edulevel'] = self::LEVEL_TEACHING;
-        $this->data['objecttable'] = 'block_questionfilter_tag_pending';
+        $this->data['objecttable'] = 'block_fragenfilter_tag_pending';
     }
 
     /**
@@ -45,7 +45,7 @@ class suggestion_reviewed extends \core\event\base {
      * @return string Localised event name.
      */
     public static function get_name(): string {
-        return get_string('event_suggestion_reviewed', 'block_questionfilter');
+        return get_string('event_suggestion_reviewed', 'block_fragenfilter');
     }
 
     /**
@@ -64,7 +64,7 @@ class suggestion_reviewed extends \core\event\base {
      * @return \moodle_url Review page.
      */
     public function get_url(): \moodle_url {
-        return new \moodle_url('/blocks/questionfilter/review.php');
+        return new \moodle_url('/blocks/fragenfilter/review.php');
     }
 
     /**

@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Upgrade steps for block_questionfilter.
+ * Upgrade steps for block_fragenfilter.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @author     Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -29,7 +29,7 @@
  * @param int $oldversion Previously installed version.
  * @return bool Always true.
  */
-function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
+function xmldb_block_fragenfilter_upgrade(int $oldversion): bool {
     global $DB;
     $dbman = $DB->get_manager();
 
@@ -39,20 +39,20 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
         'nivelevel_values' => 'difficulty_levels',
     ];
     foreach ($migrations as $oldkey => $newkey) {
-        $oldval = get_config('block_questionfilter', $oldkey);
+        $oldval = get_config('block_fragenfilter', $oldkey);
         if ($oldval !== false) {
-            $newval  = get_config('block_questionfilter', $newkey);
+            $newval  = get_config('block_fragenfilter', $newkey);
             $default = "Leicht\nMittel\nSchwer";
             if ($newval === false || trim($newval) === trim($default)) {
-                set_config($newkey, $oldval, 'block_questionfilter');
+                set_config($newkey, $oldval, 'block_fragenfilter');
             }
-            unset_config($oldkey, 'block_questionfilter');
+            unset_config($oldkey, 'block_fragenfilter');
         }
     }
 
     // Build 2026080501: create the ratings table.
     if ($oldversion < 2026080501) {
-        $table = new xmldb_table('block_questionfilter_ratings');
+        $table = new xmldb_table('block_fragenfilter_ratings');
         if (!$dbman->table_exists($table)) {
             $table->add_field('id', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, XMLDB_SEQUENCE);
             $table->add_field('questionid', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL);
@@ -68,30 +68,30 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
             $table->add_index('idx_session_question', XMLDB_INDEX_NOTUNIQUE, ['sessionhash', 'questionid']);
             $dbman->create_table($table);
         }
-        upgrade_block_savepoint(true, 2026080501, 'questionfilter');
+        upgrade_block_savepoint(true, 2026080501, 'fragenfilter');
     }
 
     // Build 2026090514: create the question preview role and give it to the pool accounts.
     // The later role steps repeat the idempotent assignment, because each savepoint must stand on its own.
     if ($oldversion < 2026090514) {
-        \block_questionfilter\preview_role::assign_to_pool_accounts();
-        upgrade_block_savepoint(true, 2026090514, 'questionfilter');
+        \block_fragenfilter\preview_role::assign_to_pool_accounts();
+        upgrade_block_savepoint(true, 2026090514, 'fragenfilter');
     }
 
     // Build 2026090524: add the export capability to the preview role.
     if ($oldversion < 2026090524) {
-        $roleshortname = 'questionfilter_preview';
+        $roleshortname = 'fragenfilter_preview';
         $sysctx = context_system::instance();
         $role = $DB->get_record('role', ['shortname' => $roleshortname]);
         if ($role) {
-            assign_capability('block/questionfilter:export', CAP_ALLOW, $role->id, $sysctx->id, true);
+            assign_capability('block/fragenfilter:export', CAP_ALLOW, $role->id, $sysctx->id, true);
         }
-        upgrade_block_savepoint(true, 2026090524, 'questionfilter');
+        upgrade_block_savepoint(true, 2026090524, 'fragenfilter');
     }
 
     // Build 2026101101: create the AI tag suggestions table.
     if ($oldversion < 2026101101) {
-        $table = new xmldb_table('block_questionfilter_tag_pending');
+        $table = new xmldb_table('block_fragenfilter_tag_pending');
         if (!$dbman->table_exists($table)) {
             $table->add_field('id', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL, XMLDB_SEQUENCE);
             $table->add_field('questionid', XMLDB_TYPE_INTEGER, '10', XMLDB_NOTNULL);
@@ -104,19 +104,19 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
             $table->add_index('idx_status', XMLDB_INDEX_NOTUNIQUE, ['status']);
             $dbman->create_table($table);
         }
-        upgrade_block_savepoint(true, 2026101101, 'questionfilter');
+        upgrade_block_savepoint(true, 2026101101, 'fragenfilter');
     }
 
     // Build 2026101601: Assign the preview role to renamed Kursfilter pool accounts (kursfilter_pool*).
     if ($oldversion < 2026101601) {
-        \block_questionfilter\preview_role::assign_to_pool_accounts();
-        upgrade_block_savepoint(true, 2026101601, 'questionfilter');
+        \block_fragenfilter\preview_role::assign_to_pool_accounts();
+        upgrade_block_savepoint(true, 2026101601, 'fragenfilter');
     }
 
     // Build 2026101603: The preview role goes to all pool accounts of block_kursfilter, including later created ones.
     if ($oldversion < 2026101603) {
-        \block_questionfilter\preview_role::assign_to_pool_accounts();
-        upgrade_block_savepoint(true, 2026101603, 'questionfilter');
+        \block_fragenfilter\preview_role::assign_to_pool_accounts();
+        upgrade_block_savepoint(true, 2026101603, 'fragenfilter');
     }
 
     return true;

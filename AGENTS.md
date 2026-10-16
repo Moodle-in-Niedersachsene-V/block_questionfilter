@@ -1,6 +1,6 @@
 # Fragebank-Filter
 
-Moodle-Block `block_questionfilter`.
+Moodle-Block `block_fragenfilter`.
 
 ## Immer relevant
 

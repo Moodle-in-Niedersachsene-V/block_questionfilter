@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace block_questionfilter;
+namespace block_fragenfilter;
 
 use PHPUnit\Framework\Attributes\CoversNothing;
 
@@ -23,7 +23,7 @@ use PHPUnit\Framework\Attributes\CoversNothing;
  *
  * HTTP requests execute in a separate web server process.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -111,7 +111,7 @@ final class request_test extends \advanced_testcase {
     private function preview_request(
         array $fields,
         bool $post,
-        string $path = '/blocks/questionfilter/guest_preview.php',
+        string $path = '/blocks/fragenfilter/guest_preview.php',
         array $headers = []
     ): string {
         $this->preventResetByRollback();
@@ -153,7 +153,7 @@ final class request_test extends \advanced_testcase {
         $this->assertSame(1, preg_match('/"sesskey":"([A-Za-z0-9]+)"/', $loginpage, $matches));
         $sesskey = $matches[1];
         $before = [];
-        foreach (['user', 'question', 'block_questionfilter_ratings', 'block_questionfilter_tag_pending'] as $table) {
+        foreach (['user', 'question', 'block_fragenfilter_ratings', 'block_fragenfilter_tag_pending'] as $table) {
             $before[$table] = $DB->get_records($table, null, 'id');
         }
 
@@ -166,7 +166,7 @@ final class request_test extends \advanced_testcase {
         ];
         foreach ($requests as [$post, $fields, $error]) {
             $body = $this->preview_request($fields, $post);
-            $component = $error === 'error_preview_needs_post' ? 'block_questionfilter' : 'error';
+            $component = $error === 'error_preview_needs_post' ? 'block_fragenfilter' : 'error';
             $this->assertStringContainsString(get_string($error, $component, 'sesskey'), $body, $error);
             $this->assertStringNotContainsString('qf_pool_login_done', $body);
             $this->assertSame(0, $DB->count_records('sessions', ['userid' => $pooluser->id]));
@@ -281,7 +281,7 @@ final class request_test extends \advanced_testcase {
             $body = $this->preview_request(
                 ['qid' => $question->id, 'sesskey' => $sesskey],
                 true,
-                '/blocks/questionfilter/guest_preview.php',
+                '/blocks/fragenfilter/guest_preview.php',
                 $headers
             );
             $this->assertStringContainsString('qf_pool_login_done', $body);
@@ -306,7 +306,7 @@ final class request_test extends \advanced_testcase {
 
         $body = $this->preview_request(['qid' => $question->id, 'sesskey' => $sesskey], true);
 
-        $this->assertStringContainsString(get_string('preview_pool_full', 'block_questionfilter'), $body);
+        $this->assertStringContainsString(get_string('preview_pool_full', 'block_fragenfilter'), $body);
         $this->assertStringNotContainsString('qf_pool_login_done', $body);
         $this->assertSame($occupied, $this->count_pool_sessions());
     }
@@ -321,11 +321,11 @@ final class request_test extends \advanced_testcase {
         $body = $this->preview_request(
             ['qid' => $question->id, 'sesskey' => $sesskey],
             true,
-            '/blocks/questionfilter/guest_preview.php',
+            '/blocks/fragenfilter/guest_preview.php',
             $headers
         );
 
-        $this->assertStringContainsString(get_string('preview_in_use', 'block_questionfilter'), $body);
+        $this->assertStringContainsString(get_string('preview_in_use', 'block_fragenfilter'), $body);
         $this->assertStringNotContainsString('qf_pool_login_done', $body);
         $this->assertSame(1, $this->count_pool_sessions());
     }
@@ -337,7 +337,7 @@ final class request_test extends \advanced_testcase {
         set_config('poolsize', 11, 'block_kursfilter');
         \block_kursfilter\pool_manager::create_pool_accounts();
         $latest = $DB->get_record('user', ['username' => 'kursfilter_pool11'], '*', MUST_EXIST);
-        $roleid = $DB->get_field('role', 'id', ['shortname' => 'questionfilter_preview'], MUST_EXIST);
+        $roleid = $DB->get_field('role', 'id', ['shortname' => 'fragenfilter_preview'], MUST_EXIST);
         $systemcontextid = \context_system::instance()->id;
         $this->assertFalse(user_has_role_assignment($latest->id, $roleid, $systemcontextid));
         foreach (\block_kursfilter\pool_manager::get_pool_usernames(10) as $username) {
@@ -357,7 +357,7 @@ final class request_test extends \advanced_testcase {
 
         $body = $this->preview_request(['qid' => 999999999, 'sesskey' => $sesskey], true);
 
-        $this->assertStringContainsString(get_string('invalidquestion', 'block_questionfilter'), $body);
+        $this->assertStringContainsString(get_string('invalidquestion', 'block_fragenfilter'), $body);
         $this->assertSame(0, $this->count_pool_sessions());
     }
 
@@ -388,25 +388,25 @@ final class request_test extends \advanced_testcase {
         $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
         $category = $generator->create_question_category();
         $question = $generator->create_question('truefalse', null, ['category' => $category->id]);
-        $pendingid = $DB->insert_record('block_questionfilter_tag_pending', (object)[
+        $pendingid = $DB->insert_record('block_fragenfilter_tag_pending', (object)[
             'questionid' => $question->id, 'tags' => 'Mathematik', 'status' => 'pending',
             'timecreated' => time(), 'timemodified' => time(),
         ]);
-        $anonymous = $this->preview_request([], false, '/blocks/questionfilter/review.php');
+        $anonymous = $this->preview_request([], false, '/blocks/fragenfilter/review.php');
         $this->assertStringNotContainsString('Mathematik', $anonymous);
         $this->assertStringContainsString('/login/index.php', $anonymous);
         $sesskey = $this->login_reviewer($user);
         $before = [];
-        foreach (['block_questionfilter_tag_pending', 'tag', 'tag_instance', 'question'] as $table) {
+        foreach (['block_fragenfilter_tag_pending', 'tag', 'tag_instance', 'question'] as $table) {
             $before[$table] = $DB->get_records($table, null, 'id');
         }
-        $path = '/blocks/questionfilter/review.php';
+        $path = '/blocks/fragenfilter/review.php';
         foreach (['', 'approve', 'reject', 'approveall', 'rejectall'] as $action) {
             $body = $this->preview_request(['action' => $action, 'id' => $pendingid, 'sesskey' => $sesskey], true, $path);
             $this->assertStringNotContainsString('Mathematik', $body);
             $this->assertStringContainsString(get_string('nopermissions', 'error', get_string(
-                'block_questionfilter:reviewtags',
-                'block_questionfilter'
+                'block_fragenfilter:reviewtags',
+                'block_fragenfilter'
             )), $body);
             foreach ($before as $table => $records) {
                 $this->assertEquals($records, $DB->get_records($table, null, 'id'), $table);
@@ -414,7 +414,7 @@ final class request_test extends \advanced_testcase {
         }
 
         $role = $this->getDataGenerator()->create_role();
-        foreach (['block/questionfilter:reviewtags', 'moodle/question:viewall', 'moodle/question:tagall'] as $capability) {
+        foreach (['block/fragenfilter:reviewtags', 'moodle/question:viewall', 'moodle/question:tagall'] as $capability) {
             assign_capability($capability, CAP_ALLOW, $role, \context_system::instance());
         }
         role_assign($role, $user->id, \context_system::instance());
@@ -434,7 +434,7 @@ final class request_test extends \advanced_testcase {
         $this->assertStringContainsString('Mathematik', $body);
         $this->assertStringContainsString('method="post"', $body);
         $this->preview_request(['action' => 'approve', 'id' => $pendingid, 'sesskey' => $sesskey], true, $path);
-        $this->assertSame('applied', $DB->get_field('block_questionfilter_tag_pending', 'status', ['id' => $pendingid]));
+        $this->assertSame('applied', $DB->get_field('block_fragenfilter_tag_pending', 'status', ['id' => $pendingid]));
         $this->assertSame(['Mathematik'], array_values(\core_tag_tag::get_item_tags_array(
             'core_question',
             'question',
@@ -460,54 +460,54 @@ final class request_test extends \advanced_testcase {
         $script = '<script>alert(1)</script>';
         $ids = [];
         foreach ([$own->id, $foreign->id, $hidden->id, 999999999] as $questionid) {
-            $ids[$questionid] = $DB->insert_record('block_questionfilter_tag_pending', (object)[
+            $ids[$questionid] = $DB->insert_record('block_fragenfilter_tag_pending', (object)[
                 'questionid' => $questionid, 'tags' => $script, 'status' => 'pending',
                 'timecreated' => time(), 'timemodified' => time(),
             ]);
         }
         \core_tag_tag::set_item_tags('core_question', 'question', $own->id, $context, ['Existing']);
         $role = $this->getDataGenerator()->create_role();
-        assign_capability('block/questionfilter:reviewtags', CAP_ALLOW, $role, \context_system::instance());
+        assign_capability('block/fragenfilter:reviewtags', CAP_ALLOW, $role, \context_system::instance());
         role_assign($role, $user->id, \context_system::instance());
         // Ownership permits tagging only the reviewer's own question, even with viewall.
         assign_capability('moodle/question:viewall', CAP_ALLOW, $role, $context);
         assign_capability('moodle/question:tagmine', CAP_ALLOW, $role, $context);
         $sesskey = $this->login_reviewer($user);
-        $path = '/blocks/questionfilter/review.php';
+        $path = '/blocks/fragenfilter/review.php';
         $page = $this->preview_request([], false, $path);
         $this->assertStringContainsString(s($script), $page);
         $this->assertStringNotContainsString($script, $page);
         foreach ([$foreign->id, $hidden->id, 999999999] as $questionid) {
             $before = [];
-            foreach (['block_questionfilter_tag_pending', 'tag', 'tag_instance'] as $table) {
+            foreach (['block_fragenfilter_tag_pending', 'tag', 'tag_instance'] as $table) {
                 $before[$table] = $DB->get_records($table, null, 'id');
             }
             foreach (['approve', 'reject'] as $action) {
                 $page = $this->preview_request([
                     'action' => $action, 'id' => $ids[$questionid], 'sesskey' => $sesskey,
                 ], true, $path);
-                $this->assertStringContainsString(get_string('error_review_unavailable', 'block_questionfilter'), $page);
+                $this->assertStringContainsString(get_string('error_review_unavailable', 'block_fragenfilter'), $page);
                 foreach ($before as $table => $records) {
                     $this->assertEquals($records, $DB->get_records($table, null, 'id'), $table);
                 }
             }
         }
         foreach (['reject', 'approveall', 'rejectall'] as $action) {
-            $DB->set_field('block_questionfilter_tag_pending', 'status', 'pending', ['id' => $ids[$own->id]]);
+            $DB->set_field('block_fragenfilter_tag_pending', 'status', 'pending', ['id' => $ids[$own->id]]);
             $this->preview_request(['action' => $action, 'id' => $ids[$own->id], 'sesskey' => $sesskey], true, $path);
             $expected = $action === 'approveall' ? 'applied' : 'rejected';
-            $this->assertSame($expected, $DB->get_field('block_questionfilter_tag_pending', 'status', ['id' => $ids[$own->id]]));
+            $this->assertSame($expected, $DB->get_field('block_fragenfilter_tag_pending', 'status', ['id' => $ids[$own->id]]));
             foreach ([$foreign->id, $hidden->id, 999999999] as $questionid) {
                 $this->assertSame(
                     'pending',
-                    $DB->get_field('block_questionfilter_tag_pending', 'status', ['id' => $ids[$questionid]])
+                    $DB->get_field('block_fragenfilter_tag_pending', 'status', ['id' => $ids[$questionid]])
                 );
             }
         }
         $this->assertContains('Existing', \core_tag_tag::get_item_tags_array('core_question', 'question', $own->id));
         // A stale pending ID cannot be applied again.
         $this->preview_request(['action' => 'approve', 'id' => $ids[$own->id], 'sesskey' => $sesskey], true, $path);
-        $this->assertSame('rejected', $DB->get_field('block_questionfilter_tag_pending', 'status', ['id' => $ids[$own->id]]));
+        $this->assertSame('rejected', $DB->get_field('block_fragenfilter_tag_pending', 'status', ['id' => $ids[$own->id]]));
     }
 
     public function test_anonymous_search_returns_a_visible_question(): void {
@@ -521,7 +521,7 @@ final class request_test extends \advanced_testcase {
 
         $result = $this->ajax([[
             'index' => 0,
-            'methodname' => 'block_questionfilter_search_questions',
+            'methodname' => 'block_fragenfilter_search_questions',
             'args' => [
                 'search' => 'Visible tracer question',
                 'contextid' => \context_system::instance()->id,
@@ -544,15 +544,15 @@ final class request_test extends \advanced_testcase {
         $contextid = \context_system::instance()->id;
         $before = [];
         $tables = ['question', 'question_versions', 'question_bank_entries', 'question_categories',
-            'question_answers', 'block_questionfilter_ratings', 'block_questionfilter_tag_pending', 'files'];
+            'question_answers', 'block_fragenfilter_ratings', 'block_fragenfilter_tag_pending', 'files'];
         foreach ($tables as $table) {
             $before[$table] = $DB->get_records($table, null, 'id');
         }
 
         // An earlier public search in the same request must not grant a login to the export.
         $responses = $this->ajax([
-            ['index' => 0, 'methodname' => 'block_questionfilter_search_questions', 'args' => ['contextid' => $contextid]],
-            ['index' => 1, 'methodname' => 'block_questionfilter_export_questions', 'args' => [
+            ['index' => 0, 'methodname' => 'block_fragenfilter_search_questions', 'args' => ['contextid' => $contextid]],
+            ['index' => 1, 'methodname' => 'block_fragenfilter_export_questions', 'args' => [
                 'questionids' => (string)$question->id,
                 'format' => 'csv',
                 'contextid' => $contextid,

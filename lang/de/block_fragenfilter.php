@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * German language strings for block_questionfilter.
+ * German language strings for block_fragenfilter.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -33,11 +33,11 @@ $string['ai_backend_claude'] = 'Anthropic Claude API';
 $string['ai_backend_ollama'] = 'Ollama (lokal)';
 $string['approved'] = 'Tag-Vorschlag wurde freigegeben.';
 $string['approved_all'] = '{$a} Tag-Vorschläge wurden freigegeben.';
-$string['block_questionfilter:addinstance'] = 'Block „Fragebank-Filter" hinzufügen';
-$string['block_questionfilter:export'] = 'Fragen exportieren';
-$string['block_questionfilter:myaddinstance'] = 'Block „Fragebank-Filter" zum Dashboard hinzufügen';
-$string['block_questionfilter:reviewtags'] = 'KI-Tag-Vorschläge prüfen und freigeben';
-$string['block_questionfilter:view'] = 'Fragebank-Filter-Block verwenden';
+$string['block_fragenfilter:addinstance'] = 'Block „Fragebank-Filter" hinzufügen';
+$string['block_fragenfilter:export'] = 'Fragen exportieren';
+$string['block_fragenfilter:myaddinstance'] = 'Block „Fragebank-Filter" zum Dashboard hinzufügen';
+$string['block_fragenfilter:reviewtags'] = 'KI-Tag-Vorschläge prüfen und freigeben';
+$string['block_fragenfilter:view'] = 'Fragebank-Filter-Block verwenden';
 $string['categories'] = 'Fragesammlungen';
 $string['col_actions'] = 'Aktionen';
 $string['col_question'] = 'Frage';
@@ -66,6 +66,11 @@ $string['export_csv'] = 'CSV-Tabelle';
 $string['export_gift'] = 'GIFT-Format';
 $string['export_xml'] = 'Moodle XML';
 $string['exportfailed'] = 'Export fehlgeschlagen. Bitte Moodle-Logs prüfen.';
+$string['fragenfilter:addinstance'] = 'Block „Fragebank-Filter" hinzufügen';
+$string['fragenfilter:export'] = 'Fragen exportieren';
+$string['fragenfilter:myaddinstance'] = 'Block „Fragebank-Filter" zum Dashboard hinzufügen';
+$string['fragenfilter:reviewtags'] = 'KI-Tag-Vorschläge prüfen und freigeben';
+$string['fragenfilter:view'] = 'Fragebank-Filter-Block verwenden';
 $string['invalidquestion'] = 'Frage nicht gefunden.';
 $string['loading'] = 'Wird geladen …';
 $string['loadingcategories'] = 'Sammlungen werden geladen …';
@@ -84,18 +89,13 @@ $string['preview_ready_title'] = 'Fragenvorschau bereit';
 $string['privacy:metadata'] = 'Der Fragebank-Filter-Block speichert keine personenbezogenen Daten. Export-Dateien werden nur temporär erzeugt und nicht dauerhaft gespeichert.';
 $string['qtypes_existing'] = 'Nur Typen mit vorhandenen Fragen';
 $string['qtypes_installed'] = 'Alle installierten Fragetypen';
-$string['questionfilter:addinstance'] = 'Block „Fragebank-Filter" hinzufügen';
-$string['questionfilter:export'] = 'Fragen exportieren';
-$string['questionfilter:myaddinstance'] = 'Block „Fragebank-Filter" zum Dashboard hinzufügen';
-$string['questionfilter:reviewtags'] = 'KI-Tag-Vorschläge prüfen und freigeben';
-$string['questionfilter:view'] = 'Fragebank-Filter-Block verwenden';
 $string['questiontypes'] = 'Fragetyp';
 $string['ratelimitexceeded'] = 'Zu viele Anfragen. Bitte warten Sie {$a->seconds} Sekunden.';
 $string['rejected'] = 'Tag-Vorschlag wurde abgelehnt.';
 $string['rejected_all'] = 'Alle ausstehenden Tag-Vorschläge wurden abgelehnt.';
 $string['review_empty'] = 'Keine ausstehenden Tag-Vorschläge vorhanden.';
 $string['review_title'] = 'KI-Tag-Vorschläge prüfen';
-$string['role_preview_desc'] = 'Rolle für die Pool-Konten des Kursfilters. Erlaubt die Fragenvorschau (moodle/question:usemine) und den Export (block/questionfilter:export).';
+$string['role_preview_desc'] = 'Rolle für die Pool-Konten des Kursfilters. Erlaubt die Fragenvorschau (moodle/question:usemine) und den Export (block/fragenfilter:export).';
 $string['role_preview_name'] = 'Fragenvorschau';
 $string['scope_all'] = 'Alle Fragesammlungen (kursübergreifend)';
 $string['scope_course'] = 'Nur aktueller Kurs';

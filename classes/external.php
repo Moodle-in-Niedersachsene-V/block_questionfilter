@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Web service functions for block_questionfilter.
+ * Web service functions for block_fragenfilter.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @author     Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -30,11 +30,11 @@ require_once($CFG->libdir . '/externallib.php');
 /**
  * Web service functions for the question bank filter.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class block_questionfilter_external extends external_api {
+class block_fragenfilter_external extends external_api {
     /** Maximum requests per user within the rate limit window. */
     const RATE_LIMIT_REQUESTS = 30;
 
@@ -57,7 +57,7 @@ class block_questionfilter_external extends external_api {
      * @throws \moodle_exception If the rate limit is exceeded.
      */
     private static function check_rate_limit(int $userid): void {
-        $cache = \cache::make('block_questionfilter', 'ratelimit');
+        $cache = \cache::make('block_fragenfilter', 'ratelimit');
         $key   = 'rl_' . $userid;
         $now   = time();
         $data  = $cache->get($key);
@@ -72,7 +72,7 @@ class block_questionfilter_external extends external_api {
 
         if ($data['count'] > self::RATE_LIMIT_REQUESTS) {
             $remaining = self::RATE_LIMIT_WINDOW - ($now - $data['window_start']);
-            throw new \moodle_exception('ratelimitexceeded', 'block_questionfilter', '', (object)[
+            throw new \moodle_exception('ratelimitexceeded', 'block_fragenfilter', '', (object)[
                 'seconds' => max(1, (int)$remaining),
             ]);
         }
@@ -133,7 +133,7 @@ class block_questionfilter_external extends external_api {
         ]);
 
         // Cap the limit at the configured maximum (DoS protection).
-        $maxlimit = (int)(get_config('block_questionfilter', 'resultlimit') ?: 200);
+        $maxlimit = (int)(get_config('block_fragenfilter', 'resultlimit') ?: 200);
         if ($params['limit'] < 1 || $params['limit'] > $maxlimit) {
             $params['limit'] = $maxlimit;
         }
@@ -156,8 +156,8 @@ class block_questionfilter_external extends external_api {
             }
         }
 
-        if (!has_capability('block/questionfilter:view', context_system::instance())) {
-            throw new moodle_exception('nopermission', 'block_questionfilter');
+        if (!has_capability('block/fragenfilter:view', context_system::instance())) {
+            throw new moodle_exception('nopermission', 'block_fragenfilter');
         }
 
         // Rate limit: at most RATE_LIMIT_REQUESTS per user within RATE_LIMIT_WINDOW seconds.
@@ -356,8 +356,8 @@ class block_questionfilter_external extends external_api {
             : context_system::instance();
         self::validate_context($context);
 
-        if (!has_capability('block/questionfilter:view', context_system::instance())) {
-            throw new moodle_exception('nopermission', 'block_questionfilter');
+        if (!has_capability('block/fragenfilter:view', context_system::instance())) {
+            throw new moodle_exception('nopermission', 'block_fragenfilter');
         }
 
         $contextids = self::get_searchable_contextids($params['scope'], $params['contextid']);
@@ -442,8 +442,8 @@ class block_questionfilter_external extends external_api {
             : context_system::instance();
         self::validate_context($context);
 
-        if (!has_capability('block/questionfilter:view', context_system::instance())) {
-            throw new moodle_exception('nopermission', 'block_questionfilter');
+        if (!has_capability('block/fragenfilter:view', context_system::instance())) {
+            throw new moodle_exception('nopermission', 'block_fragenfilter');
         }
 
         $qtypes = [];
@@ -553,13 +553,13 @@ class block_questionfilter_external extends external_api {
         self::validate_context($context);
 
         // Export requires a dedicated capability, unavailable to guests.
-        if (!has_capability('block/questionfilter:export', context_system::instance())) {
-            throw new moodle_exception('nopermission', 'block_questionfilter');
+        if (!has_capability('block/fragenfilter:export', context_system::instance())) {
+            throw new moodle_exception('nopermission', 'block_fragenfilter');
         }
 
         $ids = array_filter(array_map('intval', explode(',', $params['questionids'])));
         if (empty($ids)) {
-            throw new moodle_exception('noquestionsselected', 'block_questionfilter');
+            throw new moodle_exception('noquestionsselected', 'block_fragenfilter');
         }
 
         require_once($CFG->libdir . '/questionlib.php');
@@ -585,11 +585,11 @@ class block_questionfilter_external extends external_api {
         // Store the file in Moodle's temporary area and return its URL.
         $fs = get_file_storage();
         $sysctx = context_system::instance();
-        $fs->delete_area_files($sysctx->id, 'block_questionfilter', 'export', $params['contextid']);
+        $fs->delete_area_files($sysctx->id, 'block_fragenfilter', 'export', $params['contextid']);
 
         $fileinfo = [
             'contextid' => $sysctx->id,
-            'component' => 'block_questionfilter',
+            'component' => 'block_fragenfilter',
             'filearea' => 'export',
             'itemid' => $params['contextid'],
             'filepath' => '/',
@@ -598,7 +598,7 @@ class block_questionfilter_external extends external_api {
         $file = $fs->create_file_from_string($fileinfo, $content);
         $url = moodle_url::make_pluginfile_url(
             $sysctx->id,
-            'block_questionfilter',
+            'block_fragenfilter',
             'export',
             $params['contextid'],
             '/',
@@ -759,7 +759,7 @@ class block_questionfilter_external extends external_api {
         global $DB;
         switch ($contextlevel) {
             case CONTEXT_SYSTEM:
-                return get_string('coresystem', 'block_questionfilter');
+                return get_string('coresystem', 'block_fragenfilter');
 
             case CONTEXT_COURSECAT:
                 $name = $DB->get_field('course_categories', 'name', ['id' => $instanceid]);
@@ -1049,7 +1049,7 @@ class block_questionfilter_external extends external_api {
         $sysctx = context_system::instance();
         self::validate_context($sysctx);
 
-        $fmtconfig = get_config('block_questionfilter', 'exportformats');
+        $fmtconfig = get_config('block_fragenfilter', 'exportformats');
         if (is_array($fmtconfig)) {
             $formats = implode(',', array_keys(array_filter($fmtconfig)));
         } else {
@@ -1060,7 +1060,7 @@ class block_questionfilter_external extends external_api {
         }
 
         return [
-            'canexport'     => has_capability('block/questionfilter:export', $sysctx),
+            'canexport'     => has_capability('block/fragenfilter:export', $sysctx),
             'canpreview'    => isloggedin() && !isguestuser(),
             'isloggedin'    => isloggedin() && !isguestuser(),
             'exportformats' => $formats,
@@ -1128,15 +1128,15 @@ class block_questionfilter_external extends external_api {
             : context_system::instance();
         self::validate_context($context);
 
-        if (!has_capability('block/questionfilter:view', context_system::instance())) {
-            throw new moodle_exception('nopermission', 'block_questionfilter');
+        if (!has_capability('block/fragenfilter:view', context_system::instance())) {
+            throw new moodle_exception('nopermission', 'block_fragenfilter');
         }
 
         $r   = max(1, min(5, (int)$params['rating']));
         $qid = (int)$params['questionid'];
 
         if (!$DB->record_exists('question', ['id' => $qid])) {
-            throw new moodle_exception('invalidquestion', 'block_questionfilter');
+            throw new moodle_exception('invalidquestion', 'block_fragenfilter');
         }
 
         $now     = time();
@@ -1145,18 +1145,18 @@ class block_questionfilter_external extends external_api {
         if ($isguest) {
             $hash = clean_param($params['sessionhash'], PARAM_ALPHANUMEXT);
             if (empty($hash)) {
-                throw new moodle_exception('nosessionhash', 'block_questionfilter');
+                throw new moodle_exception('nosessionhash', 'block_fragenfilter');
             }
             $existing = $DB->get_record(
-                'block_questionfilter_ratings',
+                'block_fragenfilter_ratings',
                 ['questionid' => $qid, 'sessionhash' => $hash, 'userid' => null]
             );
             if ($existing) {
                 $existing->rating      = $r;
                 $existing->timemodified = $now;
-                $DB->update_record('block_questionfilter_ratings', $existing);
+                $DB->update_record('block_fragenfilter_ratings', $existing);
             } else {
-                $DB->insert_record('block_questionfilter_ratings', (object)[
+                $DB->insert_record('block_fragenfilter_ratings', (object)[
                     'questionid'   => $qid,
                     'userid'       => null,
                     'sessionhash'  => $hash,
@@ -1167,15 +1167,15 @@ class block_questionfilter_external extends external_api {
             }
         } else {
             $existing = $DB->get_record(
-                'block_questionfilter_ratings',
+                'block_fragenfilter_ratings',
                 ['questionid' => $qid, 'userid' => (int)$USER->id]
             );
             if ($existing) {
                 $existing->rating      = $r;
                 $existing->timemodified = $now;
-                $DB->update_record('block_questionfilter_ratings', $existing);
+                $DB->update_record('block_fragenfilter_ratings', $existing);
             } else {
-                $DB->insert_record('block_questionfilter_ratings', (object)[
+                $DB->insert_record('block_fragenfilter_ratings', (object)[
                     'questionid'   => $qid,
                     'userid'       => (int)$USER->id,
                     'sessionhash'  => null,
@@ -1244,8 +1244,8 @@ class block_questionfilter_external extends external_api {
             : context_system::instance();
         self::validate_context($context);
 
-        if (!has_capability('block/questionfilter:view', context_system::instance())) {
-            throw new moodle_exception('nopermission', 'block_questionfilter');
+        if (!has_capability('block/fragenfilter:view', context_system::instance())) {
+            throw new moodle_exception('nopermission', 'block_fragenfilter');
         }
 
         $ids = array_filter(array_map('intval', explode(',', $params['questionids'])));
@@ -1264,7 +1264,7 @@ class block_questionfilter_external extends external_api {
             "SELECT questionid,
                     AVG(rating) AS average,
                     COUNT(*)    AS cnt
-               FROM {block_questionfilter_ratings}
+               FROM {block_fragenfilter_ratings}
               WHERE questionid $insql
            GROUP BY questionid",
             $args
@@ -1275,7 +1275,7 @@ class block_questionfilter_external extends external_api {
         if ($userid) {
             $rows = $DB->get_records_sql(
                 "SELECT questionid, rating
-                   FROM {block_questionfilter_ratings}
+                   FROM {block_fragenfilter_ratings}
                   WHERE questionid $insql
                     AND userid = :uid",
                 array_merge($args, ['uid' => $userid])
@@ -1286,7 +1286,7 @@ class block_questionfilter_external extends external_api {
         } else if ($hash) {
             $rows = $DB->get_records_sql(
                 "SELECT questionid, rating
-                   FROM {block_questionfilter_ratings}
+                   FROM {block_fragenfilter_ratings}
                   WHERE questionid $insql
                     AND sessionhash = :hash
                     AND userid IS NULL",
@@ -1337,21 +1337,21 @@ class block_questionfilter_external extends external_api {
         global $DB;
 
         $avg  = (float)$DB->get_field_sql(
-            "SELECT AVG(rating) FROM {block_questionfilter_ratings} WHERE questionid = :qid",
+            "SELECT AVG(rating) FROM {block_fragenfilter_ratings} WHERE questionid = :qid",
             ['qid' => $qid]
         );
-        $cnt  = $DB->count_records('block_questionfilter_ratings', ['questionid' => $qid]);
+        $cnt  = $DB->count_records('block_fragenfilter_ratings', ['questionid' => $qid]);
         $mine = 0;
 
         if ($userid) {
             $mine = (int)($DB->get_field(
-                'block_questionfilter_ratings',
+                'block_fragenfilter_ratings',
                 'rating',
                 ['questionid' => $qid, 'userid' => $userid]
             ) ?: 0);
         } else if ($hash) {
             $mine = (int)($DB->get_field(
-                'block_questionfilter_ratings',
+                'block_fragenfilter_ratings',
                 'rating',
                 ['questionid' => $qid, 'sessionhash' => $hash, 'userid' => null]
             ) ?: 0);
@@ -1382,7 +1382,7 @@ class block_questionfilter_external extends external_api {
      *
      * Returns the question text as sanitised HTML and
      * answer options for multiple-choice questions. Available to all
-     * users with block/questionfilter:view, including guests.
+     * users with block/fragenfilter:view, including guests.
      *
      * @param int $questionid Question ID.
      * @param int $contextid  Current context.
@@ -1401,8 +1401,8 @@ class block_questionfilter_external extends external_api {
             : context_system::instance();
         self::validate_context($context);
 
-        if (!has_capability('block/questionfilter:view', context_system::instance())) {
-            throw new moodle_exception('nopermission', 'block_questionfilter');
+        if (!has_capability('block/fragenfilter:view', context_system::instance())) {
+            throw new moodle_exception('nopermission', 'block_fragenfilter');
         }
 
         $qid = (int)$params['questionid'];
@@ -1474,7 +1474,7 @@ class block_questionfilter_external extends external_api {
                     IGNORE_MULTIPLE
                 );
                 if ($answer) {
-                    $result['hinttext'] = get_string('preview_expectedanswer', 'block_questionfilter')
+                    $result['hinttext'] = get_string('preview_expectedanswer', 'block_fragenfilter')
                         . ': ' . s($answer->answer);
                 }
                 break;
@@ -1488,7 +1488,7 @@ class block_questionfilter_external extends external_api {
                     IGNORE_MULTIPLE
                 );
                 if ($answer) {
-                    $result['hinttext'] = get_string('preview_expectedanswer', 'block_questionfilter')
+                    $result['hinttext'] = get_string('preview_expectedanswer', 'block_fragenfilter')
                         . ': ' . s($answer->answer)
                         . ($answer->tolerance > 0 ? ' ± ' . s($answer->tolerance) : '');
                 }

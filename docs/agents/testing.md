@@ -8,7 +8,7 @@ Der Fragenfilter hängt von `block_kursfilter` ab (`version.php`) und baut keine
 
 Keine gemeinsam genutzte Installation, Datenbank oder laufende Instanz verwenden. Eine eigene Moodle-Kopie, eine eigene leere Datenbank und eigene Datenverzeichnisse anlegen. PHP benötigt die Moodle-Erweiterungen, insbesondere cURL und den passenden Datenbanktreiber, sowie `max_input_vars=5000` und ausreichend Speicher (lokal 512 MB).
 
-1. Moodle 5.1 oder 5.2 in ein eigenes Verzeichnis auschecken, Abhängigkeiten mit `composer install` installieren. Dieses Repo nach `public/blocks/questionfilter` verlinken oder kopieren, `block_kursfilter` von `main` nach `public/blocks/kursfilter` auschecken. Keine Secrets oder `config.php` aus einer anderen Installation übernehmen.
+1. Moodle 5.1 oder 5.2 in ein eigenes Verzeichnis auschecken, Abhängigkeiten mit `composer install` installieren. Dieses Repo nach `public/blocks/fragenfilter` verlinken oder kopieren, `block_kursfilter` von `main` nach `public/blocks/kursfilter` auschecken. Keine Secrets oder `config.php` aus einer anderen Installation übernehmen.
 2. Eine eigene `config.php` im Moodle-Root nach `config-dist.php` erstellen: Datenbanktreiber, Host, Name, Benutzer und Passwort ausschließlich der Testdatenbank, `prefix = 'mdl_'`, `wwwroot` und ein eigenes `dataroot`. Zusätzlich `phpunit_prefix = 'phpu_'` und ein separates `phpunit_dataroot` setzen. Beide Datenverzeichnisse müssen für CLI und Webserver schreibbar sein.
 3. Vor `require_once(__DIR__ . '/lib/setup.php');` die Umleitung einfügen:
 
@@ -51,10 +51,10 @@ Keine gemeinsam genutzte Installation, Datenbank oder laufende Instanz verwenden
 6. Nach erfolgreichem Start die Suite im ersten Terminal ausführen:
 
    ```bash
-   QUESTIONFILTER_WEB_URL=http://127.0.0.1:8080 vendor/bin/phpunit --fail-on-warning --testsuite block_questionfilter_testsuite
+   QUESTIONFILTER_WEB_URL=http://127.0.0.1:8080 vendor/bin/phpunit --fail-on-warning --testsuite block_fragenfilter_testsuite
    ```
 
-   `QUESTIONFILTER_WEB_TESTS` gehört in den Webserver-Prozess oder das oben gezeigte gezielte CLI-Upgrade. Im PHPUnit-Prozess darf diese Variable nicht gesetzt sein. Für einen einzelnen Test kann statt `--testsuite` der Pfad `public/blocks/questionfilter/tests/request_test.php` und optional `--filter test_anonymous_search_returns_a_visible_question` verwendet werden.
+   `QUESTIONFILTER_WEB_TESTS` gehört in den Webserver-Prozess oder das oben gezeigte gezielte CLI-Upgrade. Im PHPUnit-Prozess darf diese Variable nicht gesetzt sein. Für einen einzelnen Test kann statt `--testsuite` der Pfad `public/blocks/fragenfilter/tests/request_test.php` und optional `--filter test_anonymous_search_returns_a_visible_question` verwendet werden.
 
 Ohne `QUESTIONFILTER_WEB_URL` überspringen sich die Request-Tests gezielt; eine gesetzte, aber unerreichbare URL lässt sie fehlschlagen. Der Webserver muss dieselben PHPUnit-Tabellen und dasselbe PHPUnit-Datenverzeichnis lesen. Die Fixtures setzen `forcelogin=0`, weil ADR 0002 eine öffentliche Suche beschreibt (Moodle 5.2 liefert standardmäßig `forcelogin=1`). Der Suchtest prüft eine echte Frage über `/lib/ajax/service.php`, der Exporttest die Ablehnung ohne Anmeldung und unveränderte Fragen-, Bewertungs- und Exportdaten. Die HTTP-Anfragen senden weder Cookie noch Sesskey. Vor dem Request schließen die Tests ihre Transaktion, damit Fixtures sichtbar sind; danach erzwingen sie den vollständigen Datenbank-Reset, auch für HTTP-Schreibzugriffe außerhalb von PHPUnit.
 

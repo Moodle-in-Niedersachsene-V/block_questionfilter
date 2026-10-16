@@ -15,15 +15,15 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Preview endpoint for block_questionfilter.
+ * Preview endpoint for block_fragenfilter.
  *
  * Starts the question preview. block_kursfilter selects and occupies a pool account and
  * logs the visitor in (ADR 0002); a real login is kept. No require_login(): this endpoint
  * is intentionally public.
  *
- * Usage: POST /blocks/questionfilter/guest_preview.php, body qid=42&sesskey=...
+ * Usage: POST /blocks/fragenfilter/guest_preview.php, body qid=42&sesskey=...
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -33,17 +33,17 @@ require_once(__DIR__ . '/../../config.php'); // nosemgrep: moodle-einstiegsdatei
 
 $qid = required_param('qid', PARAM_INT);
 if (!data_submitted()) {
-    throw new moodle_exception('error_preview_needs_post', 'block_questionfilter');
+    throw new moodle_exception('error_preview_needs_post', 'block_fragenfilter');
 }
 require_sesskey();
 
 // The question must exist.
 if (!$DB->record_exists('question', ['id' => $qid, 'parent' => 0])) {
     $PAGE->set_context(context_system::instance());
-    $PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php'));
+    $PAGE->set_url(new moodle_url('/blocks/fragenfilter/guest_preview.php'));
     echo $OUTPUT->header();
     echo $OUTPUT->notification(
-        get_string('invalidquestion', 'block_questionfilter'),
+        get_string('invalidquestion', 'block_fragenfilter'),
         \core\output\notification::NOTIFY_ERROR
     );
     echo $OUTPUT->footer();
@@ -60,10 +60,10 @@ $notices = [
 ];
 if (isset($notices[$outcome])) {
     $PAGE->set_context(context_system::instance());
-    $PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php'));
+    $PAGE->set_url(new moodle_url('/blocks/fragenfilter/guest_preview.php'));
     echo $OUTPUT->header();
     echo $OUTPUT->notification(
-        get_string($notices[$outcome], 'block_questionfilter'),
+        get_string($notices[$outcome], 'block_fragenfilter'),
         \core\output\notification::NOTIFY_WARNING
     );
     echo $OUTPUT->footer();
@@ -71,7 +71,7 @@ if (isset($notices[$outcome])) {
 }
 
 // Pool accounts that block_kursfilter created after the last upgrade do not hold the preview role yet.
-\block_questionfilter\preview_role::assign_to_pool_account($USER);
+\block_fragenfilter\preview_role::assign_to_pool_account($USER);
 
 if ($outcome === \block_kursfilter\preview_starter::REDIRECT) {
     redirect($previewurl);
@@ -82,7 +82,7 @@ if ($outcome === \block_kursfilter\preview_starter::REDIRECT) {
 $previewurlstring = $previewurl->out(false);
 
 $PAGE->set_context(context_system::instance());
-$PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php', ['qid' => $qid]));
+$PAGE->set_url(new moodle_url('/blocks/fragenfilter/guest_preview.php', ['qid' => $qid]));
 $PAGE->set_pagelayout('embedded');
 echo $OUTPUT->header();
 

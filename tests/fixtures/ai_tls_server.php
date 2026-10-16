@@ -17,7 +17,7 @@
 /**
  * Independent TLS peer presenting an untrusted certificate.
  *
- * @package block_questionfilter
+ * @package block_fragenfilter
  * @copyright 2026 Moodle in Niedersachsen e. V.
  * @license https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

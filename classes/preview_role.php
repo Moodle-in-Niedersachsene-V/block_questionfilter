@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace block_questionfilter;
+namespace block_fragenfilter;
 
 /**
  * The preview role of the pool accounts of block_kursfilter.
@@ -22,13 +22,13 @@ namespace block_questionfilter;
  * The role allows the question preview and the export (ADR 0002). Block_kursfilter owns
  * the pool accounts; this class only gives them the role.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class preview_role {
     /** Role shortname. */
-    public const SHORTNAME = 'questionfilter_preview';
+    public const SHORTNAME = 'fragenfilter_preview';
 
     /**
      * Create the preview role if missing.
@@ -47,17 +47,17 @@ final class preview_role {
             return (int)$roleid;
         }
         // Capabilities from db/access.php are not yet in the database during installation.
-        update_capabilities('block_questionfilter');
+        update_capabilities('block_fragenfilter');
         $roleid = create_role(
-            get_string('role_preview_name', 'block_questionfilter'),
+            get_string('role_preview_name', 'block_fragenfilter'),
             self::SHORTNAME,
-            get_string('role_preview_desc', 'block_questionfilter'),
+            get_string('role_preview_desc', 'block_fragenfilter'),
             ''
         );
         $systemcontext = \context_system::instance();
         set_role_contextlevels($roleid, [CONTEXT_SYSTEM]);
         assign_capability('moodle/question:usemine', CAP_ALLOW, $roleid, $systemcontext->id, true);
-        assign_capability('block/questionfilter:export', CAP_ALLOW, $roleid, $systemcontext->id, true);
+        assign_capability('block/fragenfilter:export', CAP_ALLOW, $roleid, $systemcontext->id, true);
         return (int)$roleid;
     }
 

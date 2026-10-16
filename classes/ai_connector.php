@@ -15,18 +15,18 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * AI connector for block_questionfilter.
+ * AI connector for block_fragenfilter.
  *
  * Supports Ollama (local) and Claude API as interchangeable backends.
  * Question text is minimised, but free text may still contain personal data.
  * The administrator releases this transfer by enabling the scheduled task.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace block_questionfilter;
+namespace block_fragenfilter;
 
 /**
  * Sends minimised question text to a configured AI backend and
@@ -46,8 +46,8 @@ class ai_connector {
      * Constructor: loads plugin config once.
      */
     public function __construct() {
-        $this->backend = get_config('block_questionfilter', 'ai_backend') ?: 'ollama';
-        $this->config  = (array) get_config('block_questionfilter');
+        $this->backend = get_config('block_fragenfilter', 'ai_backend') ?: 'ollama';
+        $this->config  = (array) get_config('block_fragenfilter');
     }
 
     /**
@@ -67,8 +67,8 @@ class ai_connector {
         string $questiontext,
         string $qtype
     ): array {
-        $maxtags    = max(1, min(10, (int)(get_config('block_questionfilter', 'ai_max_tags') ?: 5)));
-        $categories = get_config('block_questionfilter', 'ai_tag_categories') ?: '';
+        $maxtags    = max(1, min(10, (int)(get_config('block_fragenfilter', 'ai_max_tags') ?: 5)));
+        $categories = get_config('block_fragenfilter', 'ai_tag_categories') ?: '';
 
         // Strip HTML and truncate question text to 800 characters for data minimisation.
         $plaintext = strip_tags($questiontext);
@@ -145,7 +145,7 @@ class ai_connector {
 
         $data = json_decode($response, true);
         if (!is_array($data) || !isset($data['response']) || !is_string($data['response'])) {
-            throw new \moodle_exception('error_ai_response', 'block_questionfilter');
+            throw new \moodle_exception('error_ai_response', 'block_fragenfilter');
         }
         return $data['response'];
     }
@@ -162,7 +162,7 @@ class ai_connector {
         $model  = $this->config['ai_claude_model'] ?? 'claude-haiku-4-5-20251001';
 
         if (empty($apikey)) {
-            throw new \moodle_exception('error_ai_key', 'block_questionfilter');
+            throw new \moodle_exception('error_ai_key', 'block_fragenfilter');
         }
 
         $payload = json_encode([
@@ -186,7 +186,7 @@ class ai_connector {
 
         $data = json_decode($response, true);
         if (!is_array($data) || !isset($data['content'][0]['text']) || !is_string($data['content'][0]['text'])) {
-            throw new \moodle_exception('error_ai_response', 'block_questionfilter');
+            throw new \moodle_exception('error_ai_response', 'block_fragenfilter');
         }
         return $data['content'][0]['text'];
     }
@@ -227,7 +227,7 @@ class ai_connector {
         require_once($CFG->libdir . '/filelib.php');
 
         if (strlen($payload) > self::MAX_BYTES) {
-            throw new \moodle_exception('error_ai_request_limit', 'block_questionfilter');
+            throw new \moodle_exception('error_ai_request_limit', 'block_fragenfilter');
         }
         $parts = parse_url($url);
         if (
@@ -235,7 +235,7 @@ class ai_connector {
                 || empty($parts['host']) || isset($parts['user']) || isset($parts['pass'])
                 || isset($parts['query']) || isset($parts['fragment'])
         ) {
-            throw new \moodle_exception('error_ai_target', 'block_questionfilter');
+            throw new \moodle_exception('error_ai_target', 'block_fragenfilter');
         }
 
         $body = '';
@@ -260,11 +260,11 @@ class ai_connector {
         ]);
         $curl->post($url, $payload);
         if ($oversized) {
-            throw new \moodle_exception('error_ai_response_limit', 'block_questionfilter');
+            throw new \moodle_exception('error_ai_response_limit', 'block_fragenfilter');
         }
         if ($curl->get_errno() !== 0 || ($curl->get_info()['http_code'] ?? 0) !== 200) {
             // Provider errors may contain credentials or question text; never relay their body or URL.
-            throw new \moodle_exception('error_ai_transport', 'block_questionfilter');
+            throw new \moodle_exception('error_ai_transport', 'block_fragenfilter');
         }
         return $body;
     }

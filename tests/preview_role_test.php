@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace block_questionfilter;
+namespace block_fragenfilter;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversFunction;
@@ -22,12 +22,12 @@ use PHPUnit\Framework\Attributes\CoversFunction;
 /**
  * The preview role reaches every Kursfilter pool account.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 #[CoversClass(preview_role::class)]
-#[CoversFunction('xmldb_block_questionfilter_upgrade')]
+#[CoversFunction('xmldb_block_fragenfilter_upgrade')]
 final class preview_role_test extends \advanced_testcase {
     /**
      * Returns the usernames of all pool accounts that exist, up to the hard cap.
@@ -50,7 +50,7 @@ final class preview_role_test extends \advanced_testcase {
     private function has_preview_role(string $username): bool {
         global $DB;
 
-        $roleid = $DB->get_field('role', 'id', ['shortname' => 'questionfilter_preview']);
+        $roleid = $DB->get_field('role', 'id', ['shortname' => 'fragenfilter_preview']);
         $userid = $DB->get_field('user', 'id', ['username' => $username]);
         return $roleid && $userid
             && user_has_role_assignment($userid, $roleid, \context_system::instance()->id);
@@ -59,7 +59,7 @@ final class preview_role_test extends \advanced_testcase {
     public function test_upgrade_assigns_the_preview_role_to_every_pool_account(): void {
         global $CFG, $DB;
         require_once($CFG->libdir . '/upgradelib.php');
-        require_once($CFG->dirroot . '/blocks/questionfilter/db/upgrade.php');
+        require_once($CFG->dirroot . '/blocks/fragenfilter/db/upgrade.php');
         $this->resetAfterTest();
         set_config('poolsize', 12, 'block_kursfilter');
         \block_kursfilter\pool_manager::create_pool_accounts();
@@ -67,10 +67,10 @@ final class preview_role_test extends \advanced_testcase {
         // Former account of the removed own pool: not a Kursfilter pool name.
         $legacy = $this->getDataGenerator()->create_user(['username' => 'questionfilter_guest01']);
         // State before the upgrade: the role is gone and no pool account holds it.
-        delete_role($DB->get_field('role', 'id', ['shortname' => 'questionfilter_preview'], MUST_EXIST));
-        set_config('version', 2026101602, 'block_questionfilter');
+        delete_role($DB->get_field('role', 'id', ['shortname' => 'fragenfilter_preview'], MUST_EXIST));
+        set_config('version', 2026101602, 'block_fragenfilter');
 
-        xmldb_block_questionfilter_upgrade(2026101602);
+        xmldb_block_fragenfilter_upgrade(2026101602);
 
         $poolusernames = $this->existing_pool_usernames();
         $this->assertCount(12, $poolusernames);
@@ -79,7 +79,7 @@ final class preview_role_test extends \advanced_testcase {
         }
         $this->assertFalse($this->has_preview_role($regular->username));
         $this->assertFalse($this->has_preview_role($legacy->username));
-        $roleid = $DB->get_field('role', 'id', ['shortname' => 'questionfilter_preview'], MUST_EXIST);
+        $roleid = $DB->get_field('role', 'id', ['shortname' => 'fragenfilter_preview'], MUST_EXIST);
         $systemcontext = \context_system::instance();
         $capabilities = get_capabilities_from_role_on_context($DB->get_record('role', ['id' => $roleid]), $systemcontext);
         $allowed = [];
@@ -89,13 +89,13 @@ final class preview_role_test extends \advanced_testcase {
             }
         }
         sort($allowed);
-        $this->assertSame(['block/questionfilter:export', 'moodle/question:usemine'], $allowed);
+        $this->assertSame(['block/fragenfilter:export', 'moodle/question:usemine'], $allowed);
     }
 
     public function test_lookalike_accounts_do_not_receive_the_preview_role(): void {
         global $CFG;
         require_once($CFG->libdir . '/upgradelib.php');
-        require_once($CFG->dirroot . '/blocks/questionfilter/db/upgrade.php');
+        require_once($CFG->dirroot . '/blocks/fragenfilter/db/upgrade.php');
         $this->resetAfterTest();
         // A self-registered lookalike is unconfirmed and not a manual account.
         $signup = $this->getDataGenerator()->create_user([
@@ -117,7 +117,7 @@ final class preview_role_test extends \advanced_testcase {
         $manager = \core\hook\manager::get_instance();
         foreach ([new \core\hook\after_config(), new \core\hook\output\before_http_headers($PAGE->get_renderer('core'))] as $hook) {
             foreach (iterator_to_array($manager->getListenersForEvent($hook)) as $callback) {
-                $this->assertStringStartsNotWith('block_questionfilter\\', (string)$callback, get_class($hook));
+                $this->assertStringStartsNotWith('block_fragenfilter\\', (string)$callback, get_class($hook));
             }
         }
     }

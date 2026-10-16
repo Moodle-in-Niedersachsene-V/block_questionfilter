@@ -17,24 +17,24 @@
 /**
  * Scheduled task: AI-based tag generation for questions.
  *
- * Uses block_questionfilter\ai_connector (direct Ollama/Claude call),
+ * Uses block_fragenfilter\ai_connector (direct Ollama/Claude call),
  * NOT Moodle's core_ai subsystem.
  *
  * Each question is processed once; the outcome is stored in
- * block_questionfilter_tag_pending with status:
+ * block_fragenfilter_tag_pending with status:
  *   'applied'  — tags were written directly to Moodle's tag system
  *   'pending'  — suggestion stored, waiting for manual review
  *   'empty'    — no suitable tag found
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @author     Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace block_questionfilter\task;
+namespace block_fragenfilter\task;
 
-use block_questionfilter\ai_connector;
+use block_fragenfilter\ai_connector;
 
 /**
  * Processes a batch of questions without AI-generated tags and
@@ -50,7 +50,7 @@ class generate_tags extends \core\task\scheduled_task {
      * @return string
      */
     public function get_name(): string {
-        return get_string('task_generate_tags', 'block_questionfilter');
+        return get_string('task_generate_tags', 'block_fragenfilter');
     }
 
     /**
@@ -62,22 +62,22 @@ class generate_tags extends \core\task\scheduled_task {
      * @throws \moodle_exception If AI tagging is disabled or any question could not be processed.
      */
     public function execute(): void {
-        if (!get_config('block_questionfilter', 'ai_enabled')) {
-            mtrace('block_questionfilter: KI-Verschlagwortung ist in den Einstellungen deaktiviert.');
+        if (!get_config('block_fragenfilter', 'ai_enabled')) {
+            mtrace('block_fragenfilter: KI-Verschlagwortung ist in den Einstellungen deaktiviert.');
             return;
         }
 
-        $autoapply = (bool)get_config('block_questionfilter', 'ai_autoapply');
+        $autoapply = (bool)get_config('block_fragenfilter', 'ai_autoapply');
         $batchsize = max(1, min(
             self::DEFAULT_BATCH_SIZE,
-            (int)(get_config('block_questionfilter', 'ai_batch_size') ?: self::DEFAULT_BATCH_SIZE)
+            (int)(get_config('block_fragenfilter', 'ai_batch_size') ?: self::DEFAULT_BATCH_SIZE)
         ));
         $connector = new ai_connector();
 
         $questions = self::next_questions($batchsize);
 
         if (empty($questions)) {
-            mtrace('block_questionfilter: Keine unverarbeiteten Fragen gefunden.');
+            mtrace('block_fragenfilter: Keine unverarbeiteten Fragen gefunden.');
             return;
         }
 
@@ -86,10 +86,10 @@ class generate_tags extends \core\task\scheduled_task {
             try {
                 $tags   = $connector->suggest_tags($question->name, $question->questiontext, $question->qtype);
                 $status = self::record_outcome($question, $tags, $autoapply);
-                mtrace("block_questionfilter: Frage {$question->id} ({$question->name}): "
+                mtrace("block_fragenfilter: Frage {$question->id} ({$question->name}): "
                     . $status . ' (' . implode(', ', $tags) . ')');
             } catch (\Throwable $e) {
-                mtrace("block_questionfilter: Frage {$question->id} fehlgeschlagen: " . $e->getMessage());
+                mtrace("block_fragenfilter: Frage {$question->id} fehlgeschlagen: " . $e->getMessage());
                 $failed++;
             }
         }
@@ -97,7 +97,7 @@ class generate_tags extends \core\task\scheduled_task {
         if ($failed > 0) {
             throw new \moodle_exception(
                 'error_ai_tagging_failed',
-                'block_questionfilter',
+                'block_fragenfilter',
                 '',
                 (object)['failed' => $failed, 'total' => count($questions)]
             );
@@ -108,7 +108,7 @@ class generate_tags extends \core\task\scheduled_task {
      * Returns questions that have not yet been processed by AI tagging.
      *
      * Only ready, non-template questions are included. Questions with an
-     * existing entry in block_questionfilter_tag_pending are skipped.
+     * existing entry in block_fragenfilter_tag_pending are skipped.
      *
      * @param int $limit Maximum number of questions.
      * @return \stdClass[] Question records.
@@ -120,7 +120,7 @@ class generate_tags extends \core\task\scheduled_task {
                   FROM {question} q
                  WHERE q.parent = 0
                    AND NOT EXISTS (
-                       SELECT 1 FROM {block_questionfilter_tag_pending} tp
+                       SELECT 1 FROM {block_fragenfilter_tag_pending} tp
                         WHERE tp.questionid = q.id
                    )
               ORDER BY q.id ASC";
@@ -149,7 +149,7 @@ class generate_tags extends \core\task\scheduled_task {
         }
 
         $now = time();
-        $DB->insert_record('block_questionfilter_tag_pending', (object)[
+        $DB->insert_record('block_fragenfilter_tag_pending', (object)[
             'questionid'   => (int)$question->id,
             'tags'         => implode(',', $tags),
             'status'       => $status,

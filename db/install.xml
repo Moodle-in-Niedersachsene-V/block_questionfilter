@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="blocks/questionfilter/db" VERSION="20260805" COMMENT="Question bank filter block database"
+<XMLDB PATH="blocks/fragenfilter/db" VERSION="20260805" COMMENT="Question bank filter block database"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd">
   <TABLES>
-    <TABLE NAME="block_questionfilter_ratings" COMMENT="Star ratings for questions (1-5 stars, site-wide)">
+    <TABLE NAME="block_fragenfilter_ratings" COMMENT="Star ratings for questions (1-5 stars, site-wide)">
       <FIELDS>
         <FIELD NAME="id"           TYPE="int"  LENGTH="10" NOTNULL="true"  SEQUENCE="true"/>
         <FIELD NAME="questionid"   TYPE="int"  LENGTH="10" NOTNULL="true"  COMMENT="ID of the rated question"/>
@@ -23,7 +23,7 @@
         <INDEX NAME="idx_session_question" UNIQUE="false" FIELDS="sessionhash,questionid"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="block_questionfilter_tag_pending" COMMENT="AI-generated tag suggestions for questions (pending/applied/empty)">
+    <TABLE NAME="block_fragenfilter_tag_pending" COMMENT="AI-generated tag suggestions for questions (pending/applied/empty)">
       <FIELDS>
         <FIELD NAME="id"           TYPE="int"  LENGTH="10" NOTNULL="true"  SEQUENCE="true"/>
         <FIELD NAME="questionid"   TYPE="int"  LENGTH="10" NOTNULL="true"  COMMENT="Question ID (mdl_question.id)"/>

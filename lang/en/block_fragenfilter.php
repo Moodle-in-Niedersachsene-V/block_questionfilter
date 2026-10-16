@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * English language strings for block_questionfilter.
+ * English language strings for block_fragenfilter.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -33,11 +33,11 @@ $string['ai_backend_claude'] = 'Anthropic Claude API';
 $string['ai_backend_ollama'] = 'Ollama (local)';
 $string['approved'] = 'Tag suggestion has been approved.';
 $string['approved_all'] = '{$a} tag suggestions have been approved.';
-$string['block_questionfilter:addinstance'] = 'Add a Question bank filter block';
-$string['block_questionfilter:export'] = 'Export questions';
-$string['block_questionfilter:myaddinstance'] = 'Add a Question bank filter block to Dashboard';
-$string['block_questionfilter:reviewtags'] = 'Review and approve AI tag suggestions';
-$string['block_questionfilter:view'] = 'Use the question bank filter block';
+$string['block_fragenfilter:addinstance'] = 'Add a Question bank filter block';
+$string['block_fragenfilter:export'] = 'Export questions';
+$string['block_fragenfilter:myaddinstance'] = 'Add a Question bank filter block to Dashboard';
+$string['block_fragenfilter:reviewtags'] = 'Review and approve AI tag suggestions';
+$string['block_fragenfilter:view'] = 'Use the question bank filter block';
 $string['categories'] = 'Question collections';
 $string['col_actions'] = 'Actions';
 $string['col_question'] = 'Question';
@@ -66,6 +66,11 @@ $string['export_csv'] = 'CSV spreadsheet';
 $string['export_gift'] = 'GIFT format';
 $string['export_xml'] = 'Moodle XML';
 $string['exportfailed'] = 'Export failed. Please check the Moodle logs.';
+$string['fragenfilter:addinstance'] = 'Add a Question bank filter block';
+$string['fragenfilter:export'] = 'Export questions';
+$string['fragenfilter:myaddinstance'] = 'Add a Question bank filter block to Dashboard';
+$string['fragenfilter:reviewtags'] = 'Review and approve AI tag suggestions';
+$string['fragenfilter:view'] = 'Use the question bank filter block';
 $string['invalidquestion'] = 'Question not found.';
 $string['loading'] = 'Loading …';
 $string['loadingcategories'] = 'Loading collections …';
@@ -84,18 +89,13 @@ $string['preview_ready_title'] = 'Question preview ready';
 $string['privacy:metadata'] = 'The question bank filter block does not store any personal data. Export files are generated temporarily and not stored permanently.';
 $string['qtypes_existing'] = 'Only types with existing questions';
 $string['qtypes_installed'] = 'All installed question types';
-$string['questionfilter:addinstance'] = 'Add a Question bank filter block';
-$string['questionfilter:export'] = 'Export questions';
-$string['questionfilter:myaddinstance'] = 'Add a Question bank filter block to Dashboard';
-$string['questionfilter:reviewtags'] = 'Review and approve AI tag suggestions';
-$string['questionfilter:view'] = 'Use the question bank filter block';
 $string['questiontypes'] = 'Question type';
 $string['ratelimitexceeded'] = 'Too many requests. Please wait {$a->seconds} seconds.';
 $string['rejected'] = 'Tag suggestion has been rejected.';
 $string['rejected_all'] = 'All pending tag suggestions have been rejected.';
 $string['review_empty'] = 'No pending tag suggestions found.';
 $string['review_title'] = 'Review AI tag suggestions';
-$string['role_preview_desc'] = 'Role for the pool accounts of the course filter. Grants question preview access (moodle/question:usemine) and export (block/questionfilter:export).';
+$string['role_preview_desc'] = 'Role for the pool accounts of the course filter. Grants question preview access (moodle/question:usemine) and export (block/fragenfilter:export).';
 $string['role_preview_name'] = 'Question preview';
 $string['scope_all'] = 'All question collections (cross-course)';
 $string['scope_course'] = 'Current course only';

@@ -1,4 +1,4 @@
-// AMD module for the question bank filter (block_questionfilter).
+// AMD module for the question bank filter (block_fragenfilter).
 define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
     'use strict';
 
@@ -273,7 +273,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
     BlockState.prototype.refreshCapabilities = function() {
         var self = this;
         Ajax.call([{
-            methodname: 'block_questionfilter_check_capabilities',
+            methodname: 'block_fragenfilter_check_capabilities',
             args: {contextid: self.config.contextid || 1},
             done: function(result) {
                 self.config.canexport = result.canexport;
@@ -354,7 +354,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         }
 
         Ajax.call([{
-            methodname: 'block_questionfilter_get_questiontypes',
+            methodname: 'block_fragenfilter_get_questiontypes',
             args: {
                 scope: self.config.searchscope || 'all',
                 contextid: self.config.contextid || 1,
@@ -379,7 +379,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         var self = this;
         var filterEl = self.el('cat-filter');
         Ajax.call([{
-            methodname: 'block_questionfilter_get_categories',
+            methodname: 'block_fragenfilter_get_categories',
             args: {scope: self.config.searchscope || 'all', contextid: self.config.contextid || 1},
             done: function(result) {
                 self.allCats = result.categories || [];
@@ -623,7 +623,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         }
 
         Ajax.call([{
-            methodname: 'block_questionfilter_search_questions',
+            methodname: 'block_fragenfilter_search_questions',
             args: {
                 search: self.search,
                 categories: Object.keys(self.cats).join(','),
@@ -831,7 +831,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
             return;
         }
         Ajax.call([{
-            methodname: 'block_questionfilter_export_questions',
+            methodname: 'block_fragenfilter_export_questions',
             args: {questionids: ids, format: format, contextid: self.config.contextid || 1},
             done: function(result) {
                 if (result.success && result.url) {
@@ -907,7 +907,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         window.open('', target, 'width=900,height=700,scrollbars=yes,resizable=yes');
         var form = document.createElement('form');
         form.method = 'post';
-        form.action = wwwroot + '/blocks/questionfilter/guest_preview.php';
+        form.action = wwwroot + '/blocks/fragenfilter/guest_preview.php';
         form.target = target;
         [['qid', qid], ['sesskey', M.cfg.sesskey]].forEach(function(field) {
             var input = document.createElement('input');
@@ -936,7 +936,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
             return;
         }
         Ajax.call([{
-            methodname: 'block_questionfilter_get_ratings',
+            methodname: 'block_fragenfilter_get_ratings',
             args: {
                 questionids: qids.join(','),
                 sessionhash: self.sessionHash,
@@ -961,7 +961,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
     BlockState.prototype.rateQuestion = function(qid, stars) {
         var self = this;
         Ajax.call([{
-            methodname: 'block_questionfilter_rate_question',
+            methodname: 'block_fragenfilter_rate_question',
             args: {
                 questionid:  qid,
                 rating:      stars,

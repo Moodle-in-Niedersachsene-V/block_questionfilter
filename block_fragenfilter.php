@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Block class for block_questionfilter.
+ * Block class for block_fragenfilter.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @author     Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -26,18 +26,18 @@
 /**
  * Question bank filter block class.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class block_questionfilter extends block_base {
+class block_fragenfilter extends block_base {
     /**
      * Initialises the block and sets its title.
      *
      * @return void
      */
     public function init(): void {
-        $this->title = get_string('pluginname', 'block_questionfilter');
+        $this->title = get_string('pluginname', 'block_fragenfilter');
     }
 
     /**
@@ -88,35 +88,35 @@ class block_questionfilter extends block_base {
         $this->content = new stdClass();
 
         // The dedicated view capability can be granted to guests.
-        if (!has_capability('block/questionfilter:view', context_system::instance())) {
-            $this->content->text = get_string('nopermission', 'block_questionfilter');
+        if (!has_capability('block/fragenfilter:view', context_system::instance())) {
+            $this->content->text = get_string('nopermission', 'block_fragenfilter');
             return $this->content;
         }
 
         // Check export permission and pass it to JavaScript.
         // Recalculate each time so pool accounts see the correct buttons after login.
-        $canexport = has_capability('block/questionfilter:export', context_system::instance());
+        $canexport = has_capability('block/fragenfilter:export', context_system::instance());
 
         // Load the AMD module.
-        $this->page->requires->js_call_amd('block_questionfilter/filter', 'init', [
+        $this->page->requires->js_call_amd('block_fragenfilter/filter', 'init', [
             [
                 'blockid' => (int)$this->instance->id,
                 'contextid' => (int)$this->page->context->id,
-                'searchscope' => get_config('block_questionfilter', 'searchscope') ?: 'all',
+                'searchscope' => get_config('block_fragenfilter', 'searchscope') ?: 'all',
                 'exportformats' => (function () {
-                    $fmt = get_config('block_questionfilter', 'exportformats');
+                    $fmt = get_config('block_fragenfilter', 'exportformats');
                     return is_array($fmt)
                         ? (implode(',', array_keys(array_filter($fmt))) ?: 'xml,csv,gift')
                         : ($fmt ?: 'xml,csv,gift');
                 })(),
-                'qtypessource' => get_config('block_questionfilter', 'questiontypes_source') ?: 'installed',
+                'qtypessource' => get_config('block_fragenfilter', 'questiontypes_source') ?: 'installed',
                 'wwwroot' => $CFG->wwwroot,
                 'canexport' => $canexport,
                 'isloggedin' => (isloggedin() && !isguestuser()),
             ],
         ]);
 
-        $renderer = $this->page->get_renderer('block_questionfilter');
+        $renderer = $this->page->get_renderer('block_fragenfilter');
         $this->content->text = $renderer->render_block((int)$this->instance->id, $canexport);
 
         return $this->content;

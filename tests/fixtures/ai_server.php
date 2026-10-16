@@ -17,7 +17,7 @@
 /**
  * Unmanaged HTTP peer for connector tests; unavailable in a normal web process.
  *
- * @package block_questionfilter
+ * @package block_fragenfilter
  * @copyright 2026 Moodle in Niedersachsen e. V.
  * @license https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

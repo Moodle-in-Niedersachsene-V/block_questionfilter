@@ -1,6 +1,6 @@
 # Fragebank-Filter – CLAUDE.md
 
-Moodle-Block `block_questionfilter`: kursübergreifende Suche in Fragensammlungen, mit Filtern, Bewertung und Export (Moodle XML, CSV, GIFT). Details: [README.md](README.md).
+Moodle-Block `block_fragenfilter`: kursübergreifende Suche in Fragensammlungen, mit Filtern, Bewertung und Export (Moodle XML, CSV, GIFT). Details: [README.md](README.md).
 
 - **Stack:** PHP-Plugin für Moodle (`version.php`, `requires` siehe dort), AMD-Modul in `amd/src/`, Mustache-Templates in `templates/`.
 - **GitHub:** `Moodle-in-Niedersachsene-V/block_questionfilter`

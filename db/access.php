@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Capabilities for block_questionfilter.
+ * Capabilities for block_fragenfilter.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @author     Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -28,7 +28,7 @@ defined('MOODLE_INTERNAL') || die();
 $capabilities = [
     // Permission to view and use the block.
     // Can be granted to guests under Site administration, Users, Roles.
-    'block/questionfilter:view' => [
+    'block/fragenfilter:view' => [
         'captype' => 'read',
         'contextlevel' => CONTEXT_SYSTEM,
         'archetypes' => [
@@ -43,7 +43,7 @@ $capabilities = [
 
     // Export is restricted to teachers and above.
     // RISK_PERSONAL: questions may contain personal data, such as names in question text.
-    'block/questionfilter:export' => [
+    'block/fragenfilter:export' => [
         'riskbitmask' => RISK_PERSONAL,
         'captype' => 'read',
         'contextlevel' => CONTEXT_SYSTEM,
@@ -54,7 +54,7 @@ $capabilities = [
         ],
     ],
 
-    'block/questionfilter:addinstance' => [
+    'block/fragenfilter:addinstance' => [
         'riskbitmask' => RISK_SPAM,
         'captype' => 'write',
         'contextlevel' => CONTEXT_BLOCK,
@@ -64,7 +64,7 @@ $capabilities = [
         ],
     ],
 
-    'block/questionfilter:myaddinstance' => [
+    'block/fragenfilter:myaddinstance' => [
         // Semgrep moodle-capability-ohne-riskbitmask: RISK_SPAM is set because
         // adding a block is a UI action without submitting content.
         'riskbitmask' => RISK_SPAM,
@@ -78,7 +78,7 @@ $capabilities = [
 
     // AI tagging: review and approve tag suggestions.
     // RISK_SPAM: approval writes tags to Moodle's question bank.
-    'block/questionfilter:reviewtags' => [
+    'block/fragenfilter:reviewtags' => [
         'riskbitmask' => RISK_SPAM,
         'captype' => 'write',
         'contextlevel' => CONTEXT_SYSTEM,

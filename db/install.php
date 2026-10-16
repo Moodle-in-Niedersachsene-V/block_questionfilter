@@ -15,11 +15,11 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Post-installation steps for block_questionfilter.
+ * Post-installation steps for block_fragenfilter.
  *
  * Creates the question preview role and assigns it to the pool accounts of block_kursfilter.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -27,6 +27,6 @@
 /**
  * Runs after the plugin is installed.
  */
-function xmldb_block_questionfilter_install(): void {
-    \block_questionfilter\preview_role::assign_to_pool_accounts();
+function xmldb_block_fragenfilter_install(): void {
+    \block_fragenfilter\preview_role::assign_to_pool_accounts();
 }

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace block_questionfilter;
+namespace block_fragenfilter;
 
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -22,7 +22,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 /**
  * Connector behaviour against a real unmanaged HTTP peer.
  *
- * @package block_questionfilter
+ * @package block_fragenfilter
  * @copyright 2026 Moodle in Niedersachsen e. V.
  * @license https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -95,7 +95,7 @@ final class ai_connector_test extends \advanced_testcase {
             $connection = @stream_socket_client('tcp://' . $address, $errno, $error, 0.1);
             if ($connection) {
                 fclose($connection);
-                set_config('ai_ollama_url', 'http://' . $address, 'block_questionfilter');
+                set_config('ai_ollama_url', 'http://' . $address, 'block_fragenfilter');
                 return 'http://' . $address;
             }
             usleep(20000);
@@ -115,7 +115,7 @@ final class ai_connector_test extends \advanced_testcase {
 
     public function test_normal_response_is_deduplicated_and_prompt_is_stripped_and_truncated(): void {
         $this->start_peer('normal');
-        set_config('ai_max_tags', 999, 'block_questionfilter');
+        set_config('ai_max_tags', 999, 'block_fragenfilter');
         $tags = (new ai_connector())->suggest_tags('Algebra', '<p>' . str_repeat('x', 1000) . '</p>', 'shortanswer');
         $this->assertSame(['Mathematik', 'Algebra'], $tags);
         $request = json_decode(file_get_contents($this->receipt), true, 512, JSON_THROW_ON_ERROR);
@@ -131,7 +131,7 @@ final class ai_connector_test extends \advanced_testcase {
         $tags = (new ai_connector())->suggest_tags('Algebra', 'Solve x + 1 = 2.', 'shortanswer');
         $this->assertCount(5, $tags);
         $this->assertSame(['Tag1', 'Tag2', 'Tag3', 'Tag4', 'Tag5'], $tags);
-        set_config('ai_max_tags', 999, 'block_questionfilter');
+        set_config('ai_max_tags', 999, 'block_fragenfilter');
         $tags = (new ai_connector())->suggest_tags('Algebra', 'Solve x + 1 = 2.', 'shortanswer');
         $this->assertCount(10, $tags);
         $this->assertSame('Tag10', end($tags));
@@ -215,7 +215,7 @@ final class ai_connector_test extends \advanced_testcase {
     #[DataProvider('invalid_target_provider')]
     public function test_invalid_target_is_rejected_without_a_request(string $url): void {
         $address = substr($this->start_peer('normal'), strlen('http://'));
-        set_config('ai_ollama_url', str_replace('{peer}', $address, $url), 'block_questionfilter');
+        set_config('ai_ollama_url', str_replace('{peer}', $address, $url), 'block_fragenfilter');
         try {
             (new ai_connector())->suggest_tags('Algebra', 'Private question', 'shortanswer');
             $this->fail('The invalid target was accepted.');
@@ -241,7 +241,7 @@ final class ai_connector_test extends \advanced_testcase {
 
     public function test_untrusted_tls_certificate_does_not_receive_question_data(): void {
         $url = $this->start_peer('tls');
-        set_config('ai_ollama_url', str_replace('http://127.0.0.1', 'https://localhost', $url), 'block_questionfilter');
+        set_config('ai_ollama_url', str_replace('http://127.0.0.1', 'https://localhost', $url), 'block_fragenfilter');
         try {
             (new ai_connector())->suggest_tags('Algebra', 'Private question', 'shortanswer');
             $this->fail('The untrusted certificate was accepted.');
@@ -255,7 +255,7 @@ final class ai_connector_test extends \advanced_testcase {
         global $CFG;
 
         $url = $this->start_peer('tls');
-        set_config('ai_ollama_url', str_replace('http://127.0.0.1', 'https://localhost', $url), 'block_questionfilter');
+        set_config('ai_ollama_url', str_replace('http://127.0.0.1', 'https://localhost', $url), 'block_fragenfilter');
         $cafile = $CFG->dataroot . '/moodleorgca.crt';
         $this->assertFileDoesNotExist($cafile);
         openssl_x509_export(openssl_x509_read(file_get_contents($this->certificate)), $pem);
@@ -290,10 +290,10 @@ final class ai_connector_test extends \advanced_testcase {
         $this->start_peer('normal');
         $this->create_questions('Contact Erika Example at erika@example.invalid.');
         ob_start();
-        (new \block_questionfilter\task\generate_tags())->execute();
+        (new \block_fragenfilter\task\generate_tags())->execute();
         ob_end_clean();
         $this->assertSame('', file_get_contents($this->receipt));
-        $this->assertSame(0, $DB->count_records('block_questionfilter_tag_pending'));
+        $this->assertSame(0, $DB->count_records('block_fragenfilter_tag_pending'));
     }
 
     public function test_enabled_task_limits_the_batch_and_releases_free_text(): void {
@@ -301,12 +301,12 @@ final class ai_connector_test extends \advanced_testcase {
 
         $this->start_peer('normal');
         $this->create_questions('Contact Erika Example at erika@example.invalid.');
-        set_config('ai_enabled', 1, 'block_questionfilter');
-        set_config('ai_batch_size', 999, 'block_questionfilter');
+        set_config('ai_enabled', 1, 'block_fragenfilter');
+        set_config('ai_batch_size', 999, 'block_fragenfilter');
         ob_start();
-        (new \block_questionfilter\task\generate_tags())->execute();
+        (new \block_fragenfilter\task\generate_tags())->execute();
         ob_end_clean();
-        $this->assertSame(20, $DB->count_records('block_questionfilter_tag_pending', ['status' => 'pending']));
+        $this->assertSame(20, $DB->count_records('block_fragenfilter_tag_pending', ['status' => 'pending']));
         // Enabling AI releases free text as well: removing IDs does not anonymise it.
         $this->assertStringContainsString('erika@example.invalid', file_get_contents($this->receipt));
     }

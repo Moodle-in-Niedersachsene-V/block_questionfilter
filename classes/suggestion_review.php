@@ -17,15 +17,15 @@
 /**
  * Review of AI tag suggestions: visibility, authorisation and state changes.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace block_questionfilter;
+namespace block_fragenfilter;
 
-use block_questionfilter\event\suggestion_reviewed;
-use block_questionfilter\task\generate_tags;
+use block_fragenfilter\event\suggestion_reviewed;
+use block_fragenfilter\task\generate_tags;
 
 /**
  * Decides which suggestions a reviewer may see and applies review actions.
@@ -46,7 +46,7 @@ class suggestion_review {
 
         $records = $DB->get_records_sql(
             "SELECT p.*, q.name AS questionname, q.qtype, q.createdby, qc.contextid
-               FROM {block_questionfilter_tag_pending} p
+               FROM {block_fragenfilter_tag_pending} p
                JOIN {question} q ON q.id = p.questionid
                JOIN {question_versions} qv ON qv.questionid = q.id
                JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
@@ -85,7 +85,7 @@ class suggestion_review {
         }
         $bulk = in_array($action, ['approveall', 'rejectall'], true);
         if (!$bulk && !isset($pending[$suggestionid])) {
-            throw new \moodle_exception('error_review_unavailable', 'block_questionfilter');
+            throw new \moodle_exception('error_review_unavailable', 'block_fragenfilter');
         }
         $selected = $bulk ? $pending : [$pending[$suggestionid]];
         $transaction = $DB->start_delegated_transaction();
@@ -97,7 +97,7 @@ class suggestion_review {
             } else {
                 $status = 'rejected';
             }
-            $DB->update_record('block_questionfilter_tag_pending', (object)[
+            $DB->update_record('block_fragenfilter_tag_pending', (object)[
                 'id' => $row->id, 'status' => $status, 'timemodified' => time(),
             ]);
             suggestion_reviewed::create([
