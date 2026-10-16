@@ -704,7 +704,7 @@ class block_fragenfilter_external extends external_api {
             throw new invalid_parameter_exception('Rating must be between 1 and 5.');
         }
         $qid = (int)$params['questionid'];
-        if (!$DB->record_exists('question', ['id' => $qid])) {
+        if (!\block_fragenfilter\question_visibility::is_visible($qid)) {
             throw new moodle_exception('invalidquestion', 'block_fragenfilter');
         }
         $hash = self::$ratingcookie ??= \block_kursfilter\rating_helper::renew_cookie_hash()
@@ -898,12 +898,12 @@ class block_fragenfilter_external extends external_api {
             'contextid'  => $contextid,
         ]);
 
-        $context = self::validate_search_context($params['contextid']);
+        self::validate_search_context($params['contextid']);
         if (!isloggedin() || isguestuser()) {
             throw new moodle_exception('nopermission', 'block_fragenfilter');
         }
 
-        return \block_fragenfilter\question_preview::get($params['questionid'], $context->id);
+        return \block_fragenfilter\question_preview::get($params['questionid']);
     }
 
     /**

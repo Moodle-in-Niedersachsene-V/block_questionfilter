@@ -65,6 +65,27 @@ final class question_visibility {
     }
 
     /**
+     * Whether the current user may see a ready question, as the search would list it.
+     *
+     * @param int $questionid Question ID.
+     * @return bool True if the question exists in a category the current user may view.
+     */
+    public static function is_visible(int $questionid): bool {
+        global $DB;
+
+        [$visibilitysql, $args] = self::sql('all', \context_system::instance()->id);
+        $args['questionid'] = $questionid;
+        return $DB->record_exists_sql(
+            "SELECT 1 FROM {question} q
+               JOIN {question_versions} qv ON qv.questionid = q.id
+               JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
+               JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
+              WHERE q.id = :questionid AND q.parent = 0 AND qv.status = 'ready' AND $visibilitysql",
+            $args
+        );
+    }
+
+    /**
      * Resolves all searchable context IDs for the given scope.
      *
      * Moodle 4.x:  Questions belong to course and system contexts.

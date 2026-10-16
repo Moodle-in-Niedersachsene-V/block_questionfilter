@@ -41,6 +41,9 @@ final class request_test extends \advanced_testcase {
     /** @var string Response headers of the last AJAX request. */
     private string $ajaxheaders = '';
 
+    /** @var string Redirect target of the last preview_request(), empty without a redirect. */
+    private string $redirecturl = '';
+
     /** @var string Password unique to this test run. */
     private string $password = '';
 
@@ -58,6 +61,9 @@ final class request_test extends \advanced_testcase {
         $this->resetAfterTest();
         // The materials hub exposes search to anonymous visitors.
         set_config('forcelogin', 0);
+        // The web server process runs with developer debugging shown, so notices reach the response.
+        set_config('debug', DEBUG_DEVELOPER);
+        set_config('debugdisplay', 1);
         $this->baseurl = rtrim($url, '/');
     }
 
@@ -105,6 +111,7 @@ final class request_test extends \advanced_testcase {
         });
         $body = curl_exec($ch);
         $this->assertNotFalse($body, 'Test web server not reachable: ' . curl_error($ch));
+        $this->assert_no_debug_output($body);
         $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         curl_close($ch);
         $this->assertSame(200, $status, $body);
@@ -165,6 +172,10 @@ final class request_test extends \advanced_testcase {
         global $DB;
 
         $question = $this->create_question();
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $hidden = $generator->create_question('truefalse', null, [
+            'category' => $generator->create_question_category()->id,
+        ]);
         $sesskey = $this->visitor_sesskey();
         $request = [
             'index' => 0, 'methodname' => 'block_fragenfilter_rate_question',
@@ -184,6 +195,10 @@ final class request_test extends \advanced_testcase {
                 [array_replace_recursive($request, ['args' => ['rating' => 6]]), $sesskey, 'POST'],
                 [array_replace_recursive($request, ['args' => ['questionid' => -1]]), $sesskey, 'POST'],
                 [array_replace_recursive($request, ['args' => ['questionid' => 2147483647]]), $sesskey, 'POST'],
+                [array_replace_recursive($request, ['args' => ['questionid' => $hidden->id]]), $sesskey, 'POST'],
+                [array_replace_recursive($request, ['args' => ['questionid' => 'abc']]), $sesskey, 'POST'],
+                [array_replace_recursive($request, ['args' => ['rating' => 'abc']]), $sesskey, 'POST'],
+                [array_replace_recursive($request, ['args' => ['rating' => [5]]]), $sesskey, 'POST'],
             ] as [$invalid, $key, $method]
         ) {
             $result = $this->ajax([$invalid], $key, true, $method)[0];
@@ -284,6 +299,19 @@ final class request_test extends \advanced_testcase {
     }
 
     /**
+     * Fails if a response carries a Moodle debugging message or a displayed PHP notice or warning.
+     *
+     * @param string $body Response body.
+     */
+    private function assert_no_debug_output(string $body): void {
+        $this->assertDoesNotMatchRegularExpression(
+            '/debuggingmessage|\b(?:Notice|Warning|Deprecated)\b:[^\n]* on line \d+/',
+            $body,
+            'The response contains debugging output.'
+        );
+    }
+
+    /**
      * Calls the preview endpoint with the same visitor session.
      *
      * @param array $fields Query or form fields.
@@ -322,6 +350,8 @@ final class request_test extends \advanced_testcase {
         }
         $body = curl_exec($ch);
         $this->assertNotFalse($body, 'Test web server not reachable: ' . curl_error($ch));
+        $this->assert_no_debug_output($body);
+        $this->redirecturl = (string)curl_getinfo($ch, CURLINFO_REDIRECT_URL);
         curl_close($ch);
         return $body;
     }
@@ -332,6 +362,7 @@ final class request_test extends \advanced_testcase {
         $this->setAdminUser();
         $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
         $category = $generator->create_question_category();
+        $this->make_category_visible($category);
         $question = $generator->create_question('truefalse', null, ['category' => $category->id]);
         $pooluser = $DB->get_record('user', ['username' => 'kursfilter_pool01'], '*', MUST_EXIST);
         $loginpage = $this->preview_request([], false, '/login/index.php');
@@ -436,7 +467,19 @@ final class request_test extends \advanced_testcase {
         $this->setAdminUser();
         $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
         $category = $generator->create_question_category();
+        $this->make_category_visible($category);
         return $generator->create_question('truefalse', null, ['category' => $category->id]);
+    }
+
+    /**
+     * Lets visitors and regular accounts see the questions of a category, as the hub does.
+     *
+     * @param \stdClass $category Question category.
+     */
+    private function make_category_visible(\stdClass $category): void {
+        foreach (['guestroleid', 'defaultuserroleid'] as $setting) {
+            assign_capability('moodle/question:viewall', CAP_ALLOW, get_config('core', $setting), $category->contextid);
+        }
     }
 
     public function test_preview_keeps_a_real_login_and_takes_no_pool_account(): void {
@@ -535,6 +578,58 @@ final class request_test extends \advanced_testcase {
         $this->assertStringContainsString('qf_pool_login_done', $body);
         $this->assertSame(1, $DB->count_records('sessions', ['userid' => $latest->id]));
         $this->assertTrue(user_has_role_assignment($latest->id, $roleid, $systemcontextid));
+    }
+
+    public function test_pool_account_is_kept_off_profile_pages_and_a_real_account_is_not(): void {
+        $question = $this->create_question();
+        $sesskey = $this->visitor_sesskey();
+        $body = $this->preview_request(['qid' => $question->id, 'sesskey' => $sesskey], true);
+        $this->assertStringContainsString('qf_pool_login_done', $body);
+
+        // The guard belongs to block_kursfilter; this proves it holds in the combined installation.
+        foreach (['/user/profile.php', '/user/preferences.php', '/login/change_password.php'] as $path) {
+            $this->preview_request([], false, $path);
+            $this->assertSame($this->baseurl . '/', $this->redirecturl, $path);
+        }
+        $this->preview_request([], false, '/my/');
+        $this->assertNotSame($this->baseurl . '/', $this->redirecturl);
+
+        $this->start_new_visitor();
+        $user = $this->getDataGenerator()->create_user(['password' => $this->password]);
+        $this->login_reviewer($user);
+        $body = $this->preview_request([], false, '/user/profile.php');
+        $this->assertSame('', $this->redirecturl);
+        $this->assertStringContainsString(fullname($user), $body);
+    }
+
+    public function test_preview_of_a_question_the_visitor_cannot_see_takes_no_pool_account(): void {
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category();
+        $hidden = $generator->create_question('truefalse', null, ['category' => $category->id]);
+        $sesskey = $this->visitor_sesskey();
+
+        $body = $this->preview_request(['qid' => $hidden->id, 'sesskey' => $sesskey], true);
+
+        $this->assertStringContainsString(get_string('invalidquestion', 'block_fragenfilter'), $body);
+        $this->assertStringNotContainsString('qf_pool_login_done', $body);
+        $this->assertSame(0, $this->count_pool_sessions());
+    }
+
+    public function test_preview_of_a_question_a_real_account_cannot_see_keeps_the_login_and_skips_the_preview(): void {
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category();
+        $hidden = $generator->create_question('truefalse', null, ['category' => $category->id]);
+        $user = $this->getDataGenerator()->create_user(['password' => $this->password]);
+        $sesskey = $this->login_reviewer($user);
+
+        $body = $this->preview_request(['qid' => $hidden->id, 'sesskey' => $sesskey], true);
+
+        $this->assertStringContainsString(get_string('invalidquestion', 'block_fragenfilter'), $body);
+        $this->assertStringNotContainsString('/question/bank/previewquestion/preview.php', $body);
+        $this->assertSame(0, $this->count_pool_sessions());
+        $this->assertStringContainsString('"sesskey":"' . $sesskey . '"', $this->preview_request([], false, '/my/'));
     }
 
     public function test_preview_of_an_unknown_question_takes_no_pool_account(): void {
@@ -764,6 +859,7 @@ final class request_test extends \advanced_testcase {
         $this->setAdminUser();
         $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
         $category = $generator->create_question_category();
+        $this->make_category_visible($category);
         $question = $generator->create_question('truefalse', null, [
             'category' => $category->id, 'name' => 'Allowed export example',
         ]);

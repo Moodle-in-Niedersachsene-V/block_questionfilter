@@ -37,8 +37,8 @@ if (!data_submitted()) {
 }
 require_sesskey();
 
-// The question must exist.
-if (!$DB->record_exists('question', ['id' => $qid, 'parent' => 0])) {
+// The question must exist and be visible to the visitor, as in the search; otherwise no account is taken.
+if (!\block_fragenfilter\question_visibility::is_visible($qid)) {
     $PAGE->set_context(context_system::instance());
     $PAGE->set_url(new moodle_url('/blocks/fragenfilter/guest_preview.php'));
     echo $OUTPUT->header();

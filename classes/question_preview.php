@@ -28,26 +28,14 @@ final class question_preview {
      * Returns preview data after the external API checks access to the block.
      *
      * @param int $questionid Selected question.
-     * @param int $contextid Current context.
      * @return array Sanitised preview data.
      */
-    public static function get(int $questionid, int $contextid): array {
+    public static function get(int $questionid): array {
         global $CFG, $DB;
 
         $qid = (int)$questionid;
 
-        [$visibilitysql, $args] = question_visibility::sql('all', $contextid);
-        $args['previewid'] = $qid;
-        if (
-            !$DB->record_exists_sql(
-                "SELECT 1 FROM {question} q
-               JOIN {question_versions} qv ON qv.questionid = q.id
-               JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
-               JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
-              WHERE q.id = :previewid AND q.parent = 0 AND qv.status = 'ready' AND $visibilitysql",
-                $args
-            )
-        ) {
+        if (!question_visibility::is_visible($qid)) {
             throw new \moodle_exception('invalidquestion', 'block_fragenfilter');
         }
 
