@@ -10,7 +10,8 @@ Moodle-Block `block_questionfilter`: kursübergreifende Suche in Fragensammlunge
 | Datei/Ordner | Zweck |
 |---|---|
 | `GLOSSARY.md` | Domain-Glossar mit fester Code-Schreibweise je Begriff |
-| `CODING_STANDARDS.md` | Vereinsstandards (Kopie) und projektbezogene Abweichungen |
+| `CODING_STANDARDS.md` | Verweis auf die Vereinsstandards (S/D/T/E/N/U/A/K) und projektbezogene Abweichungen |
+| `docs/adr/` | Architekturentscheidungen |
 | `docs/agents/` | Arbeitsdoku für Agenten (Issues, Labels, Domain, Testing) |
 
 ## Aufgabenhandling
@@ -37,4 +38,4 @@ Standard-Vokabular: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 
 ### Domain docs
 
-Single-context: `GLOSSARY.md` + `docs/adr/` im Root (ADR-Ordner bei Bedarf anlegen). Siehe `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` + `docs/adr/` im Root. Siehe `docs/agents/domain.md`.
