@@ -15,13 +15,13 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Post-Installationsschritte fuer block_questionfilter.
+ * Post-Installationsschritte fuer block_fragenfilter.
  *
  * Legt die systemweite Rolle "Fragenvorschau-Gast" an und
  * weist sie allen kursfilter_pool*-Pool-Nutzern zu, damit
  * diese die Moodle-Fragenvorschau nutzen koennen.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -29,8 +29,8 @@
 /**
  * Wird nach der Installation des Plugins ausgefuehrt.
  */
-function xmldb_block_questionfilter_install(): void {
-    block_questionfilter_setup_preview_role();
+function xmldb_block_fragenfilter_install(): void {
+    block_fragenfilter_setup_preview_role();
 }
 
 /**
@@ -41,19 +41,19 @@ function xmldb_block_questionfilter_install(): void {
  * damit Pool-Nutzer die Fragenvorschau aufrufen koennen,
  * ohne weitere Rechte zu erhalten.
  */
-function block_questionfilter_setup_preview_role(): void {
+function block_fragenfilter_setup_preview_role(): void {
     global $DB;
 
-    $roleshortname = 'questionfilter_preview';
+    $roleshortname = 'fragenfilter_preview';
     $sysctx        = context_system::instance();
 
     // Rolle anlegen oder vorhandene verwenden.
     $role = $DB->get_record('role', ['shortname' => $roleshortname]);
     if (!$role) {
         $roleid = create_role(
-            get_string('role_preview_name', 'block_questionfilter'),
+            get_string('role_preview_name', 'block_fragenfilter'),
             $roleshortname,
-            get_string('role_preview_desc', 'block_questionfilter'),
+            get_string('role_preview_desc', 'block_fragenfilter'),
             ''
         );
         // Rolle nur auf Systemebene verwendbar.
@@ -61,12 +61,12 @@ function block_questionfilter_setup_preview_role(): void {
         // Einzige Capability: Fragenvorschau.
         assign_capability('moodle/question:usemine', CAP_ALLOW, $roleid, $sysctx->id, true);
         // Export-Capability fuer Pool-Nutzer.
-        assign_capability('block/questionfilter:export', CAP_ALLOW, $roleid, $sysctx->id, true);
+        assign_capability('block/fragenfilter:export', CAP_ALLOW, $roleid, $sysctx->id, true);
         $role = $DB->get_record('role', ['id' => $roleid]);
     }
 
-    // Alle Pool-Nutzer (kursfilter_pool* und questionfilter_guest*) zuweisen.
-    $prefixes = ['kursfilter_pool', 'questionfilter_guest'];
+    // Alle Pool-Nutzer (kursfilter_pool*, fragenfilter_guest* und legacy questionfilter_guest*) zuweisen.
+    $prefixes = ['kursfilter_pool', 'fragenfilter_guest', 'questionfilter_guest'];
     foreach ($prefixes as $prefix) {
         $users = $DB->get_records_select(
             'user',

@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Versionsangaben des Plugins block_questionfilter.
+ * Versionsangaben des Plugins block_fragenfilter.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @author     Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -25,7 +25,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'block_questionfilter';
+$plugin->component = 'block_fragenfilter';
 $plugin->version   = 2026101601;
 $plugin->requires  = 2025100600;
 $plugin->maturity  = MATURITY_STABLE;

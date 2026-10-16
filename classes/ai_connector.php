@@ -15,18 +15,18 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * AI connector for block_questionfilter.
+ * AI connector for block_fragenfilter.
  *
  * Supports Ollama (local) and Claude API as interchangeable backends.
  * Question data is anonymised before sending: no author IDs, no
  * user-generated filenames, no Moodle-internal identifiers.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace block_questionfilter;
+namespace block_fragenfilter;
 
 /**
  * Sends anonymised question text to a configured AI backend and
@@ -43,8 +43,8 @@ class ai_connector {
      * Constructor: loads plugin config once.
      */
     public function __construct() {
-        $this->backend = get_config('block_questionfilter', 'ai_backend') ?: 'ollama';
-        $this->config  = (array) get_config('block_questionfilter');
+        $this->backend = get_config('block_fragenfilter', 'ai_backend') ?: 'ollama';
+        $this->config  = (array) get_config('block_fragenfilter');
     }
 
     /**
@@ -64,8 +64,8 @@ class ai_connector {
         string $questiontext,
         string $qtype
     ): array {
-        $maxtags    = (int)(get_config('block_questionfilter', 'ai_max_tags') ?: 5);
-        $categories = get_config('block_questionfilter', 'ai_tag_categories') ?: '';
+        $maxtags    = (int)(get_config('block_fragenfilter', 'ai_max_tags') ?: 5);
+        $categories = get_config('block_fragenfilter', 'ai_tag_categories') ?: '';
 
         // Fragetext: HTML entfernen, auf 800 Zeichen kuerzen (Datensparsamkeit).
         $plaintext = strip_tags($questiontext);

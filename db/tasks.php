@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Scheduled task definitions for block_questionfilter.
+ * Scheduled task definitions for block_fragenfilter.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @author     Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -29,7 +29,7 @@ $tasks = [
     // KI-Verschlagwortung fuer Fragen ohne Tag-Vorschlag, taeglich 03:00 Uhr.
     // Standardmaessig deaktiviert – muss in den Einstellungen aktiviert werden.
     [
-        'classname' => '\block_questionfilter\task\generate_tags',
+        'classname' => '\block_fragenfilter\task\generate_tags',
         'blocking'  => 0,
         'minute'    => '0',
         'hour'      => '3',

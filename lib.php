@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Bibliotheksfunktionen des Plugins block_questionfilter.
+ * Bibliotheksfunktionen des Plugins block_fragenfilter.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @author     Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -31,9 +31,9 @@
  * redirects for pool users). If block_kursfilter is not present, this
  * callback applies the same guards independently so pool users cannot reach
  * profile, preferences, messaging or similar pages even when only
- * block_questionfilter is installed.
+ * block_fragenfilter is installed.
  */
-function block_questionfilter_after_config(): void {
+function block_fragenfilter_after_config(): void {
     global $CFG, $USER;
 
     // Only act on real pool users.
@@ -91,7 +91,7 @@ function block_questionfilter_after_config(): void {
  * Datei-Download-Handler fuer Export-Dateien.
  *
  * Wird von Moodle automatisch aufgerufen bei
- * /pluginfile.php/.../block_questionfilter/export/...
+ * /pluginfile.php/.../block_fragenfilter/export/...
  *
  * @param stdClass $course Kursobjekt.
  * @param stdClass $cm Kursmodulobjekt.
@@ -102,7 +102,7 @@ function block_questionfilter_after_config(): void {
  * @param array $options Zusaetzliche Optionen fuer die Auslieferung.
  * @return void
  */
-function block_questionfilter_pluginfile(
+function block_fragenfilter_pluginfile(
     $course,
     $cm,
     $context,
@@ -126,7 +126,7 @@ function block_questionfilter_pluginfile(
     $filepath = $args ? '/' . implode('/', $args) . '/' : '/';
 
     $fs = get_file_storage();
-    $file = $fs->get_file($context->id, 'block_questionfilter', 'export', $itemid, $filepath, $filename);
+    $file = $fs->get_file($context->id, 'block_fragenfilter', 'export', $itemid, $filepath, $filename);
 
     if (!$file) {
         send_file_not_found();

@@ -15,15 +15,15 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Gast-Vorschau-Endpunkt fuer block_questionfilter.
+ * Gast-Vorschau-Endpunkt fuer block_fragenfilter.
  *
  * Waehlt einen Pool-Nutzer (kursfilter_pool*) aus, loggt ihn ein
  * und zeigt eine Zwischenseite mit Links zur Vorschau und zur Startseite.
  * Kein require_login() – Endpunkt ist bewusst oeffentlich.
  *
- * Aufruf: /blocks/questionfilter/guest_preview.php?qid=42
+ * Aufruf: /blocks/fragenfilter/guest_preview.php?qid=42
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -36,10 +36,10 @@ $qid = required_param('qid', PARAM_INT);
 $question = $DB->get_record('question', ['id' => $qid, 'parent' => 0], 'id, name', IGNORE_MISSING);
 if (!$question) {
     $PAGE->set_context(context_system::instance());
-    $PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php'));
+    $PAGE->set_url(new moodle_url('/blocks/fragenfilter/guest_preview.php'));
     echo $OUTPUT->header();
     echo $OUTPUT->notification(
-        get_string('invalidquestion', 'block_questionfilter'),
+        get_string('invalidquestion', 'block_fragenfilter'),
         \core\output\notification::NOTIFY_ERROR
     );
     echo $OUTPUT->footer();
@@ -52,9 +52,9 @@ if (isloggedin() && !isguestuser()) {
 }
 
 
-// Pool-Nutzer suchen: kursfilter_pool* oder questionfilter_guest*.
+// Pool-Nutzer suchen: kursfilter_pool*, fragenfilter_guest* oder legacy questionfilter_guest*.
 $pooluser = null;
-$prefixes = ['kursfilter_pool', 'questionfilter_guest'];
+$prefixes = ['kursfilter_pool', 'fragenfilter_guest', 'questionfilter_guest'];
 foreach ($prefixes as $prefix) {
     for ($i = 1; $i <= 50; $i++) {
         $username = $prefix . str_pad((string)$i, 2, '0', STR_PAD_LEFT);
@@ -73,10 +73,10 @@ foreach ($prefixes as $prefix) {
 
 if (!$pooluser) {
     $PAGE->set_context(context_system::instance());
-    $PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php', ['qid' => $qid]));
+    $PAGE->set_url(new moodle_url('/blocks/fragenfilter/guest_preview.php', ['qid' => $qid]));
     echo $OUTPUT->header();
     echo $OUTPUT->notification(
-        get_string('preview_nopooluser', 'block_questionfilter'),
+        get_string('preview_nopooluser', 'block_fragenfilter'),
         \core\output\notification::NOTIFY_WARNING
     );
     echo $OUTPUT->footer();
@@ -96,7 +96,7 @@ $previewurl = (new moodle_url(
 ))->out(false);
 
 $PAGE->set_context(context_system::instance());
-$PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php', ['qid' => $qid]));
+$PAGE->set_url(new moodle_url('/blocks/fragenfilter/guest_preview.php', ['qid' => $qid]));
 $PAGE->set_pagelayout('embedded');
 echo $OUTPUT->header();
 

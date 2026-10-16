@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Renderer des Plugins block_questionfilter.
+ * Renderer des Plugins block_fragenfilter.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @author     Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -26,11 +26,11 @@
 /**
  * Renderer des Fragebank-Filters.
  *
- * @package    block_questionfilter
+ * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class block_questionfilter_renderer extends plugin_renderer_base {
+class block_fragenfilter_renderer extends plugin_renderer_base {
     /**
      * Rendert den Blockinhalt aus dem Mustache-Template.
      *
@@ -40,7 +40,7 @@ class block_questionfilter_renderer extends plugin_renderer_base {
      */
     public function render_block(int $blockid, bool $canexport = false): string {
         // Konfigurierbare Niveaustufen aus den Administrationseinstellungen.
-        $diffraw = get_config('block_questionfilter', 'difficulty_levels') ?? "Leicht\nMittel\nSchwer";
+        $diffraw = get_config('block_fragenfilter', 'difficulty_levels') ?? "Leicht\nMittel\nSchwer";
         $difficulties = array_filter(array_map('trim', explode("\n", $diffraw)));
 
         // Export-Buttons werden immer im DOM gerendert (initial display:none).
@@ -48,9 +48,9 @@ class block_questionfilter_renderer extends plugin_renderer_base {
         $templatedata = [
             'blockid'      => $blockid,
             'difficulties' => array_values($difficulties),
-            'scope_all'    => (get_config('block_questionfilter', 'searchscope') ?: 'all') === 'all',
+            'scope_all'    => (get_config('block_fragenfilter', 'searchscope') ?: 'all') === 'all',
         ];
 
-        return $this->render_from_template('block_questionfilter/block', $templatedata);
+        return $this->render_from_template('block_fragenfilter/block', $templatedata);
     }
 }
