@@ -26,7 +26,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'block_questionfilter';
-$plugin->version   = 2026101602;
+$plugin->version   = 2026101603;
 $plugin->requires  = 2025100600;
+$plugin->dependencies = ['block_kursfilter' => 2026101501];
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = 'v1.3.10 (Build 2026101602)';
+$plugin->release   = 'v1.3.11 (Build 2026101603)';

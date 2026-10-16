@@ -32,8 +32,11 @@ final class request_test extends \advanced_testcase {
     /** @var string Test web server URL. */
     private string $baseurl = '';
 
-    /** @var string Cookie file for preview requests. */
+    /** @var string Cookie file of the current visitor. */
     private string $cookiejar = '';
+
+    /** @var string[] Cookie files of all visitors in this test. */
+    private array $cookiejars = [];
 
     /** @var string Password unique to this test run. */
     private string $password = '';
@@ -59,8 +62,8 @@ final class request_test extends \advanced_testcase {
         if (!$this->setupdone) {
             return;
         }
-        if ($this->cookiejar !== '') {
-            unlink($this->cookiejar);
+        foreach ($this->cookiejars as $cookiejar) {
+            unlink($cookiejar);
         }
         // HTTP writes bypass PHPUnit's change tracking, requiring a full reset.
         \testing_util::$tableupdated = [];
@@ -102,12 +105,19 @@ final class request_test extends \advanced_testcase {
      * @param array $fields Query or form fields.
      * @param bool $post Whether to submit a POST.
      * @param string $path Endpoint path.
+     * @param string[] $headers Additional request headers.
      * @return string Response body.
      */
-    private function preview_request(array $fields, bool $post, string $path = '/blocks/questionfilter/guest_preview.php'): string {
+    private function preview_request(
+        array $fields,
+        bool $post,
+        string $path = '/blocks/questionfilter/guest_preview.php',
+        array $headers = []
+    ): string {
         $this->preventResetByRollback();
         if ($this->cookiejar === '') {
             $this->cookiejar = tempnam(sys_get_temp_dir(), 'qfjar');
+            $this->cookiejars[] = $this->cookiejar;
         }
         $url = $this->baseurl . $path;
         if (!$post && $fields) {
@@ -118,6 +128,7 @@ final class request_test extends \advanced_testcase {
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_COOKIEFILE => $this->cookiejar,
             CURLOPT_COOKIEJAR => $this->cookiejar,
+            CURLOPT_HTTPHEADER => $headers,
             CURLOPT_TIMEOUT => 30,
         ]);
         if ($post) {
@@ -171,6 +182,183 @@ final class request_test extends \advanced_testcase {
             str_replace('\\/', '/', $body)
         );
         $this->assertSame(1, $DB->count_records('sessions', ['userid' => $pooluser->id]));
+    }
+
+    /**
+     * Starts a new visitor with an empty cookie jar.
+     */
+    private function start_new_visitor(): void {
+        $this->cookiejar = '';
+    }
+
+    /**
+     * Reads the sesskey Moodle hands to the current visitor on the login page.
+     *
+     * @param string[] $headers Additional request headers.
+     * @return string Session key.
+     */
+    private function visitor_sesskey(array $headers = []): string {
+        $page = $this->preview_request([], false, '/login/index.php', $headers);
+        $this->assertSame(1, preg_match('/"sesskey":"([A-Za-z0-9]+)"/', $page, $matches));
+        return $matches[1];
+    }
+
+    /**
+     * Occupies a pool account with a running session from the given address.
+     *
+     * @param string $username Pool account username.
+     * @param string $ip Address of the occupying session.
+     */
+    private function occupy_pool_account(string $username, string $ip): void {
+        global $DB;
+
+        $now = time();
+        $DB->insert_record('sessions', (object)[
+            'state' => 0,
+            'sid' => bin2hex(random_bytes(16)),
+            'userid' => $DB->get_field('user', 'id', ['username' => $username], MUST_EXIST),
+            'sessdata' => null,
+            'timecreated' => $now,
+            'timemodified' => $now,
+            'firstip' => $ip,
+            'lastip' => $ip,
+        ]);
+    }
+
+    /**
+     * Counts the sessions of all pool accounts.
+     *
+     * @return int Number of sessions.
+     */
+    private function count_pool_sessions(): int {
+        global $DB;
+
+        [$insql, $params] = $DB->get_in_or_equal(
+            \block_kursfilter\pool_manager::get_pool_usernames(\block_kursfilter\pool_manager::POOL_SIZE_MAX)
+        );
+        return $DB->count_records_sql(
+            "SELECT COUNT(s.id) FROM {sessions} s JOIN {user} u ON u.id = s.userid WHERE u.username $insql",
+            $params
+        );
+    }
+
+    /**
+     * Creates a visible question for the preview tests.
+     *
+     * @return \stdClass Question.
+     */
+    private function create_question(): \stdClass {
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category();
+        return $generator->create_question('truefalse', null, ['category' => $category->id]);
+    }
+
+    public function test_preview_keeps_a_real_login_and_takes_no_pool_account(): void {
+        $question = $this->create_question();
+        $user = $this->getDataGenerator()->create_user(['password' => $this->password]);
+        $sesskey = $this->login_reviewer($user);
+
+        $body = $this->preview_request(['qid' => $question->id, 'sesskey' => $sesskey], true);
+
+        $this->assertStringContainsString('/question/bank/previewquestion/preview.php?id=' . $question->id, $body);
+        $this->assertStringNotContainsString('qf_pool_login_done', $body);
+        $this->assertSame(0, $this->count_pool_sessions());
+        // The same Moodle session (same sesskey) still belongs to the real account.
+        $this->assertStringContainsString('"sesskey":"' . $sesskey . '"', $this->preview_request([], false, '/my/'));
+    }
+
+    public function test_preview_starts_pool_accounts_for_visitors_on_different_addresses(): void {
+        global $DB;
+
+        $question = $this->create_question();
+        set_config('getremoteaddrconf', GETREMOTEADDR_SKIP_HTTP_CLIENT_IP);
+        $logins = [];
+        foreach (['198.51.100.1', '198.51.100.2'] as $ip) {
+            $this->start_new_visitor();
+            $headers = ['X-Forwarded-For: ' . $ip];
+            $sesskey = $this->visitor_sesskey($headers);
+            $body = $this->preview_request(
+                ['qid' => $question->id, 'sesskey' => $sesskey],
+                true,
+                '/blocks/questionfilter/guest_preview.php',
+                $headers
+            );
+            $this->assertStringContainsString('qf_pool_login_done', $body);
+            $logins[$ip] = $DB->get_field_sql(
+                "SELECT u.username FROM {sessions} s JOIN {user} u ON u.id = s.userid WHERE s.firstip = ?",
+                [$ip]
+            );
+        }
+
+        $this->assertStringStartsWith('kursfilter_pool', $logins['198.51.100.1']);
+        $this->assertStringStartsWith('kursfilter_pool', $logins['198.51.100.2']);
+        $this->assertNotEquals($logins['198.51.100.1'], $logins['198.51.100.2']);
+    }
+
+    public function test_preview_shows_a_notice_when_the_pool_is_full(): void {
+        $question = $this->create_question();
+        foreach (\block_kursfilter\pool_manager::get_pool_usernames() as $username) {
+            $this->occupy_pool_account($username, '203.0.113.9');
+        }
+        $occupied = $this->count_pool_sessions();
+        $sesskey = $this->visitor_sesskey();
+
+        $body = $this->preview_request(['qid' => $question->id, 'sesskey' => $sesskey], true);
+
+        $this->assertStringContainsString(get_string('preview_pool_full', 'block_questionfilter'), $body);
+        $this->assertStringNotContainsString('qf_pool_login_done', $body);
+        $this->assertSame($occupied, $this->count_pool_sessions());
+    }
+
+    public function test_preview_shows_a_notice_when_the_address_already_has_a_preview(): void {
+        $question = $this->create_question();
+        set_config('getremoteaddrconf', GETREMOTEADDR_SKIP_HTTP_CLIENT_IP);
+        $this->occupy_pool_account('kursfilter_pool01', '198.51.100.7');
+        $headers = ['X-Forwarded-For: 198.51.100.7'];
+        $sesskey = $this->visitor_sesskey($headers);
+
+        $body = $this->preview_request(
+            ['qid' => $question->id, 'sesskey' => $sesskey],
+            true,
+            '/blocks/questionfilter/guest_preview.php',
+            $headers
+        );
+
+        $this->assertStringContainsString(get_string('preview_in_use', 'block_questionfilter'), $body);
+        $this->assertStringNotContainsString('qf_pool_login_done', $body);
+        $this->assertSame(1, $this->count_pool_sessions());
+    }
+
+    public function test_preview_gives_the_preview_role_to_a_pool_account_created_later(): void {
+        global $DB;
+
+        $question = $this->create_question();
+        set_config('poolsize', 11, 'block_kursfilter');
+        \block_kursfilter\pool_manager::create_pool_accounts();
+        $latest = $DB->get_record('user', ['username' => 'kursfilter_pool11'], '*', MUST_EXIST);
+        $roleid = $DB->get_field('role', 'id', ['shortname' => 'questionfilter_preview'], MUST_EXIST);
+        $systemcontextid = \context_system::instance()->id;
+        $this->assertFalse(user_has_role_assignment($latest->id, $roleid, $systemcontextid));
+        foreach (\block_kursfilter\pool_manager::get_pool_usernames(10) as $username) {
+            $this->occupy_pool_account($username, '203.0.113.9');
+        }
+        $sesskey = $this->visitor_sesskey();
+
+        $body = $this->preview_request(['qid' => $question->id, 'sesskey' => $sesskey], true);
+
+        $this->assertStringContainsString('qf_pool_login_done', $body);
+        $this->assertSame(1, $DB->count_records('sessions', ['userid' => $latest->id]));
+        $this->assertTrue(user_has_role_assignment($latest->id, $roleid, $systemcontextid));
+    }
+
+    public function test_preview_of_an_unknown_question_takes_no_pool_account(): void {
+        $sesskey = $this->visitor_sesskey();
+
+        $body = $this->preview_request(['qid' => 999999999, 'sesskey' => $sesskey], true);
+
+        $this->assertStringContainsString(get_string('invalidquestion', 'block_questionfilter'), $body);
+        $this->assertSame(0, $this->count_pool_sessions());
     }
 
     /**

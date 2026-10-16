@@ -2,7 +2,7 @@
 
 PHPUnit läuft in einer isolierten Moodle-Testinstallation. CI prüft Moodle 5.1/PHP 8.3 mit MariaDB 10.11 und Moodle 5.2/PHP 8.4 mit PostgreSQL 16. Beide Jobs installieren `block_kursfilter` von `main` per `moodle-plugin-ci add-plugin` und führen `moodle-plugin-ci phpunit --fail-on-warning` aus. phpcs, phpdoc, savepoints, mustache und grunt bleiben aktiv.
 
-`tests/hook_callbacks_test.php` prüft zusätzlich die echte Registrierung und den Dispatch von `core\hook\after_config` sowie die Delegation der Pool-Schutzgrenzen an den installierten Kursfilter.
+Der Fragenfilter hängt von `block_kursfilter` ab (`version.php`) und baut keine eigenen Pool-Sperren. `tests/preview_role_test.php` prüft, dass er keine eigenen Hook-Callbacks für Pool-Konten registriert, und die Vorschaurolle (Upgrade-Schritt, Ausschluss ähnlich benannter Konten). Die Pool-Grenzen selbst testet der Kursfilter.
 
 ## Lokale Vorbereitung
 
@@ -98,12 +98,27 @@ Scans und den Plugin-Scan mit JSON-Bericht, Logs und getrennten Exitdateien aus.
 Die Fixtures werden nur gescannt, nie als PHP ausgeführt. Sie prüfen Auswahl und
 Exitverhalten des Gates, keine vollständige Wirksamkeit aller 23 Regeln.
 
-Der zusätzliche HTTP-Test
-`request_test::test_preview_rejects_get_and_invalid_sesskeys_before_logging_in`
-prüft GET ohne, mit falschem und mit gültigem Sesskey sowie POST ohne/mit falschem Sesskey: keine
-Pool-Anmeldung und unveränderte Nutzer-, Fragen-, Bewertungs- und Tag-Daten.
-Der Gegenfall POST mit gültigem Sesskey startet die Vorschau und meldet das
-Pool-Konto an. Pool-Belegung und Fragen-Sichtbarkeit bleiben eigene Fälle (#8/#9).
+## Vorschau-Start (#7, #8)
+
+`request_test` prüft den Vorschau-Einstieg `guest_preview.php` gegen den echten Webserver:
+
+- `test_preview_rejects_get_and_invalid_sesskeys_before_logging_in`: GET ohne, mit
+  falschem und mit gültigem Sesskey sowie POST ohne/mit falschem Sesskey melden kein Pool-Konto an
+  und lassen Nutzer-, Fragen-, Bewertungs- und Tag-Daten unverändert. Gegenfall: gültiger POST
+  meldet ein Pool-Konto an und liefert das Vorschauziel.
+- `test_preview_keeps_a_real_login_and_takes_no_pool_account`: eine echte Anmeldung wird nicht ersetzt.
+- `test_preview_starts_pool_accounts_for_visitors_on_different_addresses`: zwei Besucher
+  (Adresse per `X-Forwarded-For`, `getremoteaddrconf` gesetzt) erhalten verschiedene Pool-Konten.
+- `test_preview_shows_a_notice_when_the_pool_is_full` und
+  `test_preview_shows_a_notice_when_the_address_already_has_a_preview`: Hinweis, keine neue Sitzung.
+- `test_preview_gives_the_preview_role_to_a_pool_account_created_later`: ein nach dem Upgrade
+  angelegtes Pool-Konto erhält beim Start die Vorschaurolle.
+- `test_preview_of_an_unknown_question_takes_no_pool_account`.
+
+Belegung, IP-Grenze und Seitensperren testet der Kursfilter
+(`preview_starter_test`, `hook_callbacks_test`); Belege für #8 liegen unter
+`/tmp/questionfilter-spec2-issue8/`. Der Kursfilter muss lokal in der Version von `main` stehen
+(`preview_starter::start(null, …)` seit Merge 811973e).
 
 ## KI-Prüfseite und Connector (#12)
 

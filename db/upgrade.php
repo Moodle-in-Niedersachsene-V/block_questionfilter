@@ -71,11 +71,10 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
         upgrade_block_savepoint(true, 2026080501, 'questionfilter');
     }
 
-    // Build 2026090514: create the system role for question preview guests.
+    // Build 2026090514: create the question preview role and give it to the pool accounts.
+    // The later role steps repeat the idempotent assignment, because each savepoint must stand on its own.
     if ($oldversion < 2026090514) {
-        global $CFG;
-        require_once(__DIR__ . '/install.php');
-        block_questionfilter_setup_preview_role();
+        \block_questionfilter\preview_role::assign_to_pool_accounts();
         upgrade_block_savepoint(true, 2026090514, 'questionfilter');
     }
 
@@ -110,9 +109,14 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
 
     // Build 2026101601: Assign the preview role to renamed Kursfilter pool accounts (kursfilter_pool*).
     if ($oldversion < 2026101601) {
-        require_once(__DIR__ . '/install.php');
-        block_questionfilter_setup_preview_role();
+        \block_questionfilter\preview_role::assign_to_pool_accounts();
         upgrade_block_savepoint(true, 2026101601, 'questionfilter');
+    }
+
+    // Build 2026101603: The preview role goes to all pool accounts of block_kursfilter, including later created ones.
+    if ($oldversion < 2026101603) {
+        \block_questionfilter\preview_role::assign_to_pool_accounts();
+        upgrade_block_savepoint(true, 2026101603, 'questionfilter');
     }
 
     return true;

@@ -15,11 +15,11 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Guest preview endpoint for block_questionfilter.
+ * Preview endpoint for block_questionfilter.
  *
- * Selects a pool account (kursfilter_pool*), logs them in
- * and shows an intermediate page with links to the preview and home page.
- * No require_login(): this endpoint is intentionally public.
+ * Starts the question preview. block_kursfilter selects and occupies a pool account and
+ * logs the visitor in (ADR 0002); a real login is kept. No require_login(): this endpoint
+ * is intentionally public.
  *
  * Usage: POST /blocks/questionfilter/guest_preview.php, body qid=42&sesskey=...
  *
@@ -51,54 +51,35 @@ if (!$question) {
     exit;
 }
 
-// Redirect already logged-in users directly to the preview.
-if (isloggedin() && !isguestuser()) {
-    redirect(new moodle_url('/question/bank/previewquestion/preview.php', ['id' => $qid]));
-}
+$previewurl = new moodle_url('/question/bank/previewquestion/preview.php', ['id' => $qid]);
+$outcome = \block_kursfilter\preview_starter::start(null, isloggedin() && !isguestuser());
 
-
-// Find pool accounts: kursfilter_pool* or questionfilter_guest*.
-$pooluser = null;
-$prefixes = ['kursfilter_pool', 'questionfilter_guest'];
-foreach ($prefixes as $prefix) {
-    for ($i = 1; $i <= 50; $i++) {
-        $username = $prefix . str_pad((string)$i, 2, '0', STR_PAD_LEFT);
-        $user = $DB->get_record(
-            'user',
-            ['username' => $username, 'deleted' => 0, 'suspended' => 0],
-            '*',
-            IGNORE_MISSING
-        );
-        if ($user) {
-            $pooluser = $user;
-            break 2;
-        }
-    }
-}
-
-if (!$pooluser) {
+$notices = [
+    \block_kursfilter\preview_starter::POOL_FULL => 'preview_pool_full',
+    \block_kursfilter\preview_starter::IP_IN_USE => 'preview_in_use',
+];
+if (isset($notices[$outcome])) {
     $PAGE->set_context(context_system::instance());
-    $PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php', ['qid' => $qid]));
+    $PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php'));
     echo $OUTPUT->header();
     echo $OUTPUT->notification(
-        get_string('preview_nopooluser', 'block_questionfilter'),
+        get_string($notices[$outcome], 'block_questionfilter'),
         \core\output\notification::NOTIFY_WARNING
     );
     echo $OUTPUT->footer();
     exit;
 }
 
-// Log in the pool account.
-$pooluser = get_complete_user_data('id', $pooluser->id);
-complete_user_login($pooluser);
+// Pool accounts that block_kursfilter created after the last upgrade do not hold the preview role yet.
+\block_questionfilter\preview_role::assign_to_pool_account($USER);
 
-// After login, render an intermediate page that notifies the opener tab
-// via postMessage so refreshCapabilities() shows the export buttons,
-// then navigate directly to the question preview.
-$previewurl = (new moodle_url(
-    '/question/bank/previewquestion/preview.php',
-    ['id' => $qid]
-))->out(false);
+if ($outcome === \block_kursfilter\preview_starter::REDIRECT) {
+    redirect($previewurl);
+}
+
+// The pool account is logged in: notify the opener tab via postMessage so
+// refreshCapabilities() shows the export buttons, then open the question preview.
+$previewurlstring = $previewurl->out(false);
 
 $PAGE->set_context(context_system::instance());
 $PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php', ['qid' => $qid]));
@@ -106,7 +87,7 @@ $PAGE->set_pagelayout('embedded');
 echo $OUTPUT->header();
 
 $wwwrootjson  = json_encode($CFG->wwwroot);
-$previewurljson = json_encode($previewurl);
+$previewurljson = json_encode($previewurlstring);
 
 echo <<<HTML
 <script>
