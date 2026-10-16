@@ -21,6 +21,7 @@ Moodle-Block `block_questionfilter`: kursübergreifende Suche in Fragensammlunge
 - Änderungen an `amd/src/` brauchen einen Grunt-Build (`amd/build/`), sonst schlägt der CI-Schritt `grunt` fehl.
 - Nach Änderungen an `db/access.php`, `db/services.php`, `db/install.xml` oder `version.php` Moodle-Upgrade ausführen.
 - Testen: siehe [`docs/agents/testing.md`](docs/agents/testing.md).
+- Spec #2: Vor jedem Folgeticket den [Sicherheits-Fallplan](docs/fallplan.md) lesen und dessen betroffene Fälle nach den dortigen Nachweisregeln in derselben Änderung aktualisieren.
 
 ## Git/gh-Workflow
 
