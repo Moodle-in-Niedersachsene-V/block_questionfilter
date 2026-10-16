@@ -43,6 +43,8 @@ final class request_test extends \advanced_testcase {
         parent::setUp();
         $this->setupdone = true;
         $this->resetAfterTest();
+        // The materials hub exposes search to anonymous visitors.
+        set_config('forcelogin', 0);
         $this->baseurl = rtrim($url, '/');
     }
 
