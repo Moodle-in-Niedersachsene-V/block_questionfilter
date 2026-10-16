@@ -44,7 +44,6 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         this.panelQuery = '';
         this.debounce = null;
         this.ratings = {}; // {qid: {average, count, myrating}}.
-        this.sessionHash = getSessionHash();
     }
 
     BlockState.prototype.el = function(id) {
@@ -850,33 +849,6 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
     // Re-enable once a specific quiz context (course + quiz ID) is known.
     BlockState.prototype.addToQuiz = function() { /* Noop — reserved for future use. */ };
 
-    /**
-     * Session hash for guest ratings, generated once per session.
-     *
-     * @return {String} 64-character hexadecimal string.
-     */
-    function getSessionHash() {
-        var key = 'qf_session_hash';
-        var h = '';
-        try {
-            h = sessionStorage.getItem(key) || '';
-        } catch (e) {
-            // Private mode.
-        }
-        if (!h) {
-            var chars = 'abcdef0123456789';
-            for (var i = 0; i < 64; i++) {
-                h += chars[Math.floor(Math.random() * chars.length)];
-            }
-            try {
-                sessionStorage.setItem(key, h);
-            } catch (e) {
-                // Ignore storage errors.
-            }
-        }
-        return h;
-    }
-
     // ---------------------------------------------------------------
     // Preview modal.
     // ---------------------------------------------------------------
@@ -939,7 +911,6 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
             methodname: 'block_fragenfilter_get_ratings',
             args: {
                 questionids: qids.join(','),
-                sessionhash: self.sessionHash,
                 contextid: self.config.contextid || 1,
             },
             done: function(result) {
@@ -965,7 +936,6 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
             args: {
                 questionid:  qid,
                 rating:      stars,
-                sessionhash: self.sessionHash,
                 contextid: self.config.contextid || 1,
             },
             done: function(result) {

@@ -38,6 +38,9 @@ final class request_test extends \advanced_testcase {
     /** @var string[] Cookie files of all visitors in this test. */
     private array $cookiejars = [];
 
+    /** @var string Response headers of the last AJAX request. */
+    private string $ajaxheaders = '';
+
     /** @var string Password unique to this test run. */
     private string $password = '';
 
@@ -77,21 +80,29 @@ final class request_test extends \advanced_testcase {
      *
      * @param array $requests AJAX batch with registered functions and arguments.
      * @param string $sesskey Optional authenticated visitor session key.
+     * @param bool $cookies Send the visitor's cookies even without a sesskey.
+     * @param string $method HTTP method.
      * @return array Decoded AJAX responses.
      */
-    private function ajax(array $requests, string $sesskey = ''): array {
+    private function ajax(array $requests, string $sesskey = '', bool $cookies = false, string $method = 'POST'): array {
         // Commit fixtures through Moodle's public test API before the separate process reads them.
         $this->preventResetByRollback();
         $ch = curl_init($this->baseurl . '/lib/ajax/service.php' . ($sesskey ? '?sesskey=' . $sesskey : ''));
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
+            CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_POSTFIELDS => json_encode($requests),
-            CURLOPT_COOKIEFILE => $sesskey ? $this->cookiejar : '',
-            CURLOPT_COOKIEJAR => $sesskey ? $this->cookiejar : '',
+            CURLOPT_COOKIEFILE => $sesskey || $cookies ? $this->cookiejar : '',
+            CURLOPT_COOKIEJAR => $sesskey || $cookies ? $this->cookiejar : '',
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 30,
         ]);
+        $this->ajaxheaders = '';
+        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, string $header): int {
+            $this->ajaxheaders .= $header;
+            return strlen($header);
+        });
         $body = curl_exec($ch);
         $this->assertNotFalse($body, 'Test web server not reachable: ' . curl_error($ch));
         $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
@@ -100,6 +111,176 @@ final class request_test extends \advanced_testcase {
         $response = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
         $this->assertArrayHasKey(0, $response, $body);
         return $response;
+    }
+
+    public function test_rating_uses_a_server_cookie_once_per_question(): void {
+        global $DB;
+
+        $question = $this->create_question();
+        $other = $this->create_question();
+        // The web server process only logs events when a log store is enabled.
+        set_config('enabled_stores', 'logstore_standard', 'tool_log');
+        set_config('buffersize', 0, 'logstore_standard');
+        $sesskey = $this->visitor_sesskey();
+        $request = [
+            'index' => 0, 'methodname' => 'block_fragenfilter_rate_question',
+            'args' => ['questionid' => $question->id, 'rating' => 4, 'contextid' => 1],
+        ];
+        $result = $this->ajax([$request], $sesskey)[0];
+        $this->assertFalse($result['error'], json_encode($result));
+        $this->assertSame(['average' => 4, 'count' => 1, 'myrating' => 4], $result['data']);
+        $this->assertSame(1, preg_match('/Set-Cookie: kf_rater_id=([a-f0-9]{64});([^\r\n]+)/i', $this->ajaxheaders, $cookie));
+        foreach (['secure', 'HttpOnly', 'SameSite=Lax', 'path=/'] as $option) {
+            $this->assertStringContainsString($option, $cookie[2]);
+        }
+        $this->assertMatchesRegularExpression('/Max-Age=31536000\b/', $cookie[2]);
+        $stored = $DB->get_record('block_fragenfilter_ratings', ['questionid' => $question->id], '*', MUST_EXIST);
+        $this->assertSame($cookie[1], $stored->cookiehash);
+        $this->assertSame(4, (int)$stored->stars);
+        $request['args']['rating'] = 1;
+        $again = $this->ajax([$request], $sesskey)[0];
+        $this->assertFalse($again['error'], json_encode($again));
+        $this->assertSame($result['data'], $again['data']);
+        $this->assertEquals($stored, $DB->get_record('block_fragenfilter_ratings', ['id' => $stored->id]));
+        // Only the accepted rating is logged, without the cookie hash.
+        $logs = $DB->get_records('logstore_standard_log', ['eventname' => '\\block_fragenfilter\\event\\question_rated']);
+        $this->assertCount(1, $logs);
+        $log = reset($logs);
+        $this->assertEquals($stored->id, $log->objectid);
+        $this->assertSame(['questionid' => (int)$question->id, 'stars' => 4], json_decode($log->other, true));
+        $this->assertStringNotContainsString($cookie[1], json_encode($log));
+        $read = $this->ajax([[
+            'index' => 0, 'methodname' => 'block_fragenfilter_get_ratings',
+            'args' => ['questionids' => $question->id . ',' . $other->id, 'contextid' => 1],
+        ]], $sesskey)[0];
+        $this->assertFalse($read['error'], json_encode($read));
+        $this->assertSame(4, $read['data']['ratings'][0]['myrating']);
+        $this->assertSame(0, $read['data']['ratings'][1]['myrating']);
+        $request['args']['questionid'] = $other->id;
+        $this->assertSame(1, $this->ajax([$request], $sesskey)[0]['data']['count']);
+        $this->assertSame(2, $DB->count_records('block_fragenfilter_ratings', ['cookiehash' => $cookie[1]]));
+    }
+
+    public function test_rating_rejects_invalid_requests_without_changing_domain_data(): void {
+        global $DB;
+
+        $question = $this->create_question();
+        $sesskey = $this->visitor_sesskey();
+        $request = [
+            'index' => 0, 'methodname' => 'block_fragenfilter_rate_question',
+            'args' => ['questionid' => $question->id, 'rating' => 5, 'contextid' => 1],
+        ];
+        $before = [];
+        foreach (['question', 'question_answers', 'block_fragenfilter_ratings', 'block_fragenfilter_tag_pending'] as $table) {
+            $before[$table] = $DB->get_records($table, null, 'id');
+        }
+        foreach (
+            [
+                [$request, '', 'POST'],
+                [$request, 'wrong12345', 'POST'],
+                [$request, $sesskey, 'GET'],
+                [$request, $sesskey, 'PUT'],
+                [array_replace_recursive($request, ['args' => ['rating' => 0]]), $sesskey, 'POST'],
+                [array_replace_recursive($request, ['args' => ['rating' => 6]]), $sesskey, 'POST'],
+                [array_replace_recursive($request, ['args' => ['questionid' => -1]]), $sesskey, 'POST'],
+                [array_replace_recursive($request, ['args' => ['questionid' => 2147483647]]), $sesskey, 'POST'],
+            ] as [$invalid, $key, $method]
+        ) {
+            $result = $this->ajax([$invalid], $key, true, $method)[0];
+            $this->assertTrue($result['error'], json_encode($result));
+            $this->assertArrayNotHasKey('data', $result);
+            $this->assertStringNotContainsString('kf_rater_id=', $this->ajaxheaders);
+            foreach ($before as $table => $records) {
+                $this->assertEquals($records, $DB->get_records($table, null, 'id'), $table);
+            }
+        }
+        $accepted = $this->ajax([$request], $sesskey)[0];
+        $this->assertFalse($accepted['error'], json_encode($accepted));
+        $this->assertSame(1, $accepted['data']['count']);
+        // A forged legacy parameter cannot choose a second identity for the same cookie.
+        $request['args']['sessionhash'] = str_repeat('b', 64);
+        $request['args']['cookiehash'] = str_repeat('c', 64);
+        $request['args']['rating'] = 1;
+        $forged = $this->ajax([$request], $sesskey)[0];
+        $this->assertTrue($forged['error'], 'Unknown identity parameters must be rejected.');
+        $this->assertSame(1, $DB->count_records('block_fragenfilter_ratings'));
+        $this->assertSame(5, (int)$DB->get_field('block_fragenfilter_ratings', 'stars', ['questionid' => $question->id]));
+    }
+
+    public function test_rating_requires_block_permission_for_writes_and_reads(): void {
+        global $DB;
+
+        $question = $this->create_question();
+        $user = $this->getDataGenerator()->create_user(['password' => $this->password]);
+        $role = create_role('Denied ratings', 'deniedratings', '');
+        assign_capability('block/fragenfilter:view', CAP_PROHIBIT, $role, 1);
+        role_assign($role, $user->id, 1);
+        $key = $this->login_reviewer($user);
+        foreach (['block_fragenfilter_rate_question', 'block_fragenfilter_get_ratings'] as $method) {
+            $args = $method === 'block_fragenfilter_rate_question'
+                ? ['questionid' => $question->id, 'rating' => 3, 'contextid' => 1]
+                : ['questionids' => (string)$question->id, 'contextid' => 1];
+            $result = $this->ajax([['index' => 0, 'methodname' => $method, 'args' => $args]], $key)[0];
+            $this->assertTrue($result['error'], json_encode($result));
+            $this->assertSame('nopermission', $result['exception']['errorcode']);
+            $this->assertSame(0, $DB->count_records('block_fragenfilter_ratings'));
+            $this->assertStringNotContainsString('kf_rater_id=', $this->ajaxheaders);
+        }
+    }
+
+    public function test_rating_identity_is_the_cookie_even_when_a_pool_account_is_reused(): void {
+        global $DB;
+
+        $question = $this->create_question();
+        $user = $DB->get_record('user', ['username' => 'kursfilter_pool01'], '*', MUST_EXIST);
+        update_internal_user_password($user, $this->password);
+        $request = [
+            'index' => 0, 'methodname' => 'block_fragenfilter_rate_question',
+            'args' => ['questionid' => $question->id, 'rating' => 5, 'contextid' => 1],
+        ];
+        $key = $this->login_reviewer($user);
+        $firstjar = $this->cookiejar;
+        $first = $this->ajax([$request], $key)[0];
+        $this->assertFalse($first['error'], json_encode($first));
+        $this->start_new_visitor();
+        $secondkey = $this->login_reviewer($user);
+        $request['args']['rating'] = 1;
+        $second = $this->ajax([$request], $secondkey)[0];
+        $this->assertFalse($second['error'], json_encode($second));
+        $this->assertSame(['average' => 3, 'count' => 2, 'myrating' => 1], $second['data']);
+        $this->assertSame(2, count(array_unique($DB->get_fieldset_select('block_fragenfilter_ratings', 'cookiehash', '1 = 1'))));
+        $this->cookiejar = $firstjar;
+        $read = $this->ajax([[
+            'index' => 0, 'methodname' => 'block_fragenfilter_get_ratings',
+            'args' => ['questionids' => (string)$question->id, 'contextid' => 1],
+        ]], $key)[0];
+        $this->assertFalse($read['error'], json_encode($read));
+        $this->assertSame(5, $read['data']['ratings'][0]['myrating']);
+    }
+
+    public function test_first_rating_batch_uses_one_cookie_for_writes_and_reads(): void {
+        global $DB;
+
+        $question = $this->create_question();
+        $sesskey = $this->visitor_sesskey();
+        $write = [
+            'index' => 0, 'methodname' => 'block_fragenfilter_rate_question',
+            'args' => ['questionid' => $question->id, 'rating' => 3, 'contextid' => 1],
+        ];
+        $again = $write;
+        $again['index'] = 1;
+        $again['args']['rating'] = 1;
+        $read = [
+            'index' => 2, 'methodname' => 'block_fragenfilter_get_ratings',
+            'args' => ['questionids' => (string)$question->id, 'contextid' => 1],
+        ];
+        $results = $this->ajax([$write, $again, $read], $sesskey);
+        foreach ($results as $result) {
+            $this->assertFalse($result['error'], json_encode($result));
+        }
+        $this->assertSame(['average' => 3, 'count' => 1, 'myrating' => 3], $results[1]['data']);
+        $this->assertSame(3, $results[2]['data']['ratings'][0]['myrating']);
+        $this->assertSame(1, $DB->count_records('block_fragenfilter_ratings'));
     }
 
     /**

@@ -56,7 +56,7 @@ Keine gemeinsam genutzte Installation, Datenbank oder laufende Instanz verwenden
 
    `QUESTIONFILTER_WEB_TESTS` gehört in den Webserver-Prozess oder das oben gezeigte gezielte CLI-Upgrade. Im PHPUnit-Prozess darf diese Variable nicht gesetzt sein. Für einen einzelnen Test kann statt `--testsuite` der Pfad `public/blocks/fragenfilter/tests/request_test.php` und optional `--filter test_anonymous_search_returns_a_visible_question` verwendet werden.
 
-Ohne `QUESTIONFILTER_WEB_URL` überspringen sich die Request-Tests gezielt; eine gesetzte, aber unerreichbare URL lässt sie fehlschlagen. Der Webserver muss dieselben PHPUnit-Tabellen und dasselbe PHPUnit-Datenverzeichnis lesen. Die Fixtures setzen `forcelogin=0`, weil ADR 0002 eine öffentliche Suche beschreibt (Moodle 5.2 liefert standardmäßig `forcelogin=1`). Der Suchtest prüft eine echte Frage über `/lib/ajax/service.php`, der Exporttest die Ablehnung ohne Anmeldung und unveränderte Fragen-, Bewertungs- und Exportdaten. Die HTTP-Anfragen senden weder Cookie noch Sesskey. Vor dem Request schließen die Tests ihre Transaktion, damit Fixtures sichtbar sind; danach erzwingen sie den vollständigen Datenbank-Reset, auch für HTTP-Schreibzugriffe außerhalb von PHPUnit.
+Ohne `QUESTIONFILTER_WEB_URL` überspringen sich die Request-Tests gezielt; eine gesetzte, aber unerreichbare URL lässt sie fehlschlagen. Der Webserver muss dieselben PHPUnit-Tabellen und dasselbe PHPUnit-Datenverzeichnis lesen. Die Fixtures setzen `forcelogin=0`, weil ADR 0002 eine öffentliche Suche beschreibt (Moodle 5.2 liefert standardmäßig `forcelogin=1`). Der Suchtest prüft eine echte Frage über `/lib/ajax/service.php`, der Exporttest die Ablehnung ohne Anmeldung und unveränderte Fragen-, Bewertungs- und Exportdaten. Die HTTP-Anfragen der Such- und Exporttests senden weder Cookie noch Sesskey; die Bewertungstests senden Sesskey und, wo nötig, das Cookie `kf_rater_id`. Vor dem Request schließen die Tests ihre Transaktion, damit Fixtures sichtbar sind; danach erzwingen sie den vollständigen Datenbank-Reset, auch für HTTP-Schreibzugriffe außerhalb von PHPUnit.
 
 Der lokale Nachweis für das Testgerüst wurde unter `/tmp/questionfilter-spec2-issue5/` mit eigenen Moodle-5.1/PHP-8.3- und Moodle-5.2/PHP-8.4-Installationen geführt, jeweils mit separatem PostgreSQL-Container und PHP-Container. Beide Installationen bestehen die strengen CI-Nachinstallationsschritte (`--buildconfig`, `--buildcomponentconfigs`) und `moodle-plugin-ci phpunit --fail-on-warning` mit echten HTTP-Requests. Die verbindlichen MariaDB-/PostgreSQL-Matrixnachweise liefert CI. Der Webserver und die Datenbank waren ausschließlich für diesen Lauf angelegt. Logs und tatsächliche Exitcodes liegen getrennt vor.
 
@@ -162,3 +162,30 @@ Ollama geprüft; ein realer Anthropic-Aufruf ist kein lokaler Nachweis.
 Entwicklungsbelege, Rot-/Grün-Läufe, Gate-/Vollscan und Reviewprotokolle:
 `/tmp/questionfilter-spec2-issue12/`. CI für den finalen Commit bleibt ein
 zusätzlicher Pflichtnachweis, insbesondere Moodle 5.1 mit MariaDB.
+
+## Cookie-Bewertungen und Upgrade (#10)
+
+`request_test` ruft die Bewertungs- und Lese-API über den echten AJAX-Endpunkt auf:
+anonymer Besucher ohne Bewertungs-Cookie, erneuter Aufruf mit demselben Cookie,
+andere Frage, neuer Browser am selben Pool-Konto und mehrere Aufrufe im ersten
+AJAX-Batch. Fehlender/falscher Sesskey, GET/PUT, Sterne außerhalb 1–5,
+unbekannte Frage und fehlendes Blockrecht dürfen keine Fachdaten ändern.
+Mitgesendete alte Kennungen wählen keine andere Identität. Cookie-Header werden
+auf SHA-256-Format, Laufzeit und Sicherheitsattribute geprüft; kein Browser- oder
+HTTPS-Transporttest. Kursfilter-Helper aus `main` (`811973e`) bleiben unverändert.
+
+`rating_upgrade_test` baut ausschließlich in der eigenen PHPUnit-Datenbank das
+alte Schema auf und führt den echten Upgrade-Einstieg aus, einmal leer und einmal
+mit Konto-/Gastbewertungen einschließlich doppelter alter Kennung. Sterne,
+Frage und Erstellungszeit bleiben erhalten; `userid`, `sessionhash` und
+`timemodified` entfallen. Altbewertungen erhalten `cookiehash = NULL`: Sie zählen
+weiter im Durchschnitt, sind aber keinem heutigen Besucher zugeordnet. Der
+Eindeutigkeitsindex schützt neue Bewertungen je Frage und Cookie. Die installierte
+Tabellenstruktur wird auch bei einem Testfehler wiederhergestellt.
+
+**Vor Deploy zwingend extern:** Altbestand im Live-Hub prüfen und im PR belegen.
+Lokale Fixtures ersetzen diesen Nachweis nicht; #10 bleibt bis dahin offen.
+Privacy-Metadaten einschließlich des neuen Ereignisses `question_rated` folgen in
+#11. Das Ereignis enthält Frage und Sterne, keine Cookie-Kennung; Moodle-Logs
+können dennoch Konto/IP zuordnen. Belege: `/tmp/questionfilter-spec2-issue10/`,
+dauerhafte ignorierte Sicherung `.issue10-evidence.tar.gz` und `.issue10-resume.md`.

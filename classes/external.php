@@ -47,6 +47,9 @@ class block_fragenfilter_external extends external_api {
     /** Default result limit when the caller does not provide one. */
     const DEFAULT_RESULT_LIMIT = 200;
 
+    /** @var string|null Rating cookie shared by all calls in the current AJAX batch. */
+    private static ?string $ratingcookie = null;
+
     /**
      * Checks the sliding rate limit for the given user.
      *
@@ -670,108 +673,60 @@ class block_fragenfilter_external extends external_api {
         return new external_function_parameters([
             'questionid'  => new external_value(PARAM_INT, 'Question ID'),
             'rating'      => new external_value(PARAM_INT, 'Rating 1-5'),
-            'sessionhash' => new external_value(PARAM_ALPHANUMEXT, 'Session hash for guests', VALUE_DEFAULT, ''),
             'contextid'   => new external_value(PARAM_INT, 'Context', VALUE_DEFAULT, 1),
         ]);
     }
 
     /**
-     * Saves a question's star rating.
+     * Saves at most one rating per question and Kursfilter cookie (ADR 0003).
      *
-     * Logged-in users are identified by userid;
-     * guests use a client-side session hash.
-     * Each user or guest can submit one rating per question
-     * and update it later.
+     * Context and block access are checked by validate_search_context().
      *
-     * @param int    $questionid  Question ID.
-     * @param int    $rating      Rating from 1 to 5.
-     * @param string $sessionhash Session hash for guests.
-     * @param int    $contextid   Current context.
+     * @param int $questionid Question ID.
+     * @param int $rating Rating from 1 to 5.
+     * @param int $contextid Current context.
      * @return array Current average, count and own rating.
-     */
-    public static function rate_question(
-        int $questionid,
-        int $rating,
-        string $sessionhash,
-        int $contextid
-    ): array {
-        global $DB, $USER;
+     * nosemgrep: moodle-external-ohne-kontextpruefung */
+    public static function rate_question(int $questionid, int $rating, int $contextid): array {
+        global $DB;
 
         $params = self::validate_parameters(self::rate_question_parameters(), [
-            'questionid'  => $questionid,
-            'rating'      => $rating,
-            'sessionhash' => $sessionhash,
-            'contextid'   => $contextid,
+            'questionid' => $questionid,
+            'rating' => $rating,
+            'contextid' => $contextid,
         ]);
-
-        $context = $params['contextid'] > 0
-            ? context::instance_by_id($params['contextid'], IGNORE_MISSING) ?? context_system::instance()
-            : context_system::instance();
-        self::validate_context($context);
-
-        if (!has_capability('block/fragenfilter:view', context_system::instance())) {
-            throw new moodle_exception('nopermission', 'block_fragenfilter');
+        $context = self::validate_search_context($params['contextid']);
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            throw new invalid_parameter_exception('Ratings require POST.');
         }
-
-        $r   = max(1, min(5, (int)$params['rating']));
+        require_sesskey();
+        if ($params['rating'] < 1 || $params['rating'] > 5) {
+            throw new invalid_parameter_exception('Rating must be between 1 and 5.');
+        }
         $qid = (int)$params['questionid'];
-
         if (!$DB->record_exists('question', ['id' => $qid])) {
             throw new moodle_exception('invalidquestion', 'block_fragenfilter');
         }
-
-        $now     = time();
-        $isguest = isguestuser() || !isloggedin();
-
-        if ($isguest) {
-            $hash = clean_param($params['sessionhash'], PARAM_ALPHANUMEXT);
-            if (empty($hash)) {
-                throw new moodle_exception('nosessionhash', 'block_fragenfilter');
+        $hash = self::$ratingcookie ??= \block_kursfilter\rating_helper::renew_cookie_hash()
+            ?? \block_kursfilter\rating_helper::create_cookie_hash();
+        $record = (object)[
+            'questionid' => $qid, 'cookiehash' => $hash,
+            'stars' => $params['rating'], 'timecreated' => time(),
+        ];
+        // The unique index also protects simultaneous requests from the same browser.
+        try {
+            $record->id = $DB->insert_record('block_fragenfilter_ratings', $record);
+        } catch (dml_write_exception $e) {
+            if (!$DB->record_exists('block_fragenfilter_ratings', ['questionid' => $qid, 'cookiehash' => $hash])) {
+                throw $e;
             }
-            $existing = $DB->get_record(
-                'block_fragenfilter_ratings',
-                ['questionid' => $qid, 'sessionhash' => $hash, 'userid' => null]
-            );
-            if ($existing) {
-                $existing->rating      = $r;
-                $existing->timemodified = $now;
-                $DB->update_record('block_fragenfilter_ratings', $existing);
-            } else {
-                $DB->insert_record('block_fragenfilter_ratings', (object)[
-                    'questionid'   => $qid,
-                    'userid'       => null,
-                    'sessionhash'  => $hash,
-                    'rating'       => $r,
-                    'timecreated'  => $now,
-                    'timemodified' => $now,
-                ]);
-            }
-        } else {
-            $existing = $DB->get_record(
-                'block_fragenfilter_ratings',
-                ['questionid' => $qid, 'userid' => (int)$USER->id]
-            );
-            if ($existing) {
-                $existing->rating      = $r;
-                $existing->timemodified = $now;
-                $DB->update_record('block_fragenfilter_ratings', $existing);
-            } else {
-                $DB->insert_record('block_fragenfilter_ratings', (object)[
-                    'questionid'   => $qid,
-                    'userid'       => (int)$USER->id,
-                    'sessionhash'  => null,
-                    'rating'       => $r,
-                    'timecreated'  => $now,
-                    'timemodified' => $now,
-                ]);
-            }
+            return self::compute_rating($qid, $hash);
         }
-
-        return self::compute_rating(
-            $qid,
-            $isguest ? null : (int)$USER->id,
-            $isguest ? $params['sessionhash'] : ''
-        );
+        \block_fragenfilter\event\question_rated::create([
+            'context' => $context, 'objectid' => $record->id,
+            'other' => ['questionid' => $qid, 'stars' => $params['rating']],
+        ])->trigger();
+        return self::compute_rating($qid, $hash);
     }
 
     /**
@@ -794,7 +749,6 @@ class block_fragenfilter_external extends external_api {
     public static function get_ratings_parameters(): external_function_parameters {
         return new external_function_parameters([
             'questionids' => new external_value(PARAM_TEXT, 'Comma-separated question IDs'),
-            'sessionhash' => new external_value(PARAM_ALPHANUMEXT, 'Session hash for guests', VALUE_DEFAULT, ''),
             'contextid'   => new external_value(PARAM_INT, 'Context', VALUE_DEFAULT, 1),
         ]);
     }
@@ -802,48 +756,38 @@ class block_fragenfilter_external extends external_api {
     /**
      * Loads rating data for multiple questions.
      *
+     * Context and block access are checked by validate_search_context().
+     *
      * @param string $questionids Comma-separated question IDs.
-     * @param string $sessionhash Session hash for guests.
      * @param int    $contextid   Current context.
      * @return array Average, count and own rating for each question.
-     */
+     * nosemgrep: moodle-external-ohne-kontextpruefung */
     public static function get_ratings(
         string $questionids,
-        string $sessionhash,
         int $contextid
     ): array {
-        global $DB, $USER;
+        global $DB;
 
         $params = self::validate_parameters(self::get_ratings_parameters(), [
             'questionids' => $questionids,
-            'sessionhash' => $sessionhash,
             'contextid'   => $contextid,
         ]);
 
-        $context = $params['contextid'] > 0
-            ? context::instance_by_id($params['contextid'], IGNORE_MISSING) ?? context_system::instance()
-            : context_system::instance();
-        self::validate_context($context);
-
-        if (!has_capability('block/fragenfilter:view', context_system::instance())) {
-            throw new moodle_exception('nopermission', 'block_fragenfilter');
-        }
+        self::validate_search_context($params['contextid']);
 
         $ids = array_filter(array_map('intval', explode(',', $params['questionids'])));
         if (empty($ids)) {
             return ['ratings' => []];
         }
 
-        $isguest = isguestuser() || !isloggedin();
-        $userid  = $isguest ? null : (int)$USER->id;
-        $hash    = clean_param($params['sessionhash'], PARAM_ALPHANUMEXT);
+        $hash = self::$ratingcookie ?? \block_kursfilter\rating_helper::get_cookie_hash();
 
         [$insql, $args] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'qid');
 
         // Average and count per question.
         $avgs = $DB->get_records_sql(
             "SELECT questionid,
-                    AVG(rating) AS average,
+                    AVG(stars) AS average,
                     COUNT(*)    AS cnt
                FROM {block_fragenfilter_ratings}
               WHERE questionid $insql
@@ -851,30 +795,17 @@ class block_fragenfilter_external extends external_api {
             $args
         );
 
-        // The current user's or guest's own rating.
         $myratings = [];
-        if ($userid) {
+        if ($hash !== null) {
             $rows = $DB->get_records_sql(
-                "SELECT questionid, rating
+                "SELECT questionid, stars
                    FROM {block_fragenfilter_ratings}
                   WHERE questionid $insql
-                    AND userid = :uid",
-                array_merge($args, ['uid' => $userid])
-            );
-            foreach ($rows as $row) {
-                $myratings[(int)$row->questionid] = (int)$row->rating;
-            }
-        } else if ($hash) {
-            $rows = $DB->get_records_sql(
-                "SELECT questionid, rating
-                   FROM {block_fragenfilter_ratings}
-                  WHERE questionid $insql
-                    AND sessionhash = :hash
-                    AND userid IS NULL",
+                    AND cookiehash = :hash",
                 array_merge($args, ['hash' => $hash])
             );
             foreach ($rows as $row) {
-                $myratings[(int)$row->questionid] = (int)$row->rating;
+                $myratings[(int)$row->questionid] = (int)$row->stars;
             }
         }
 
@@ -910,33 +841,22 @@ class block_fragenfilter_external extends external_api {
      * Calculates the average and own rating for one question.
      *
      * @param int      $qid    Question ID.
-     * @param int|null $userid User ID or null for guests.
-     * @param string   $hash   Session hash for guests.
+     * @param string $hash Kursfilter cookie hash.
      * @return array Average, count and own rating.
      */
-    private static function compute_rating(int $qid, ?int $userid, string $hash): array {
+    private static function compute_rating(int $qid, string $hash): array {
         global $DB;
 
         $avg  = (float)$DB->get_field_sql(
-            "SELECT AVG(rating) FROM {block_fragenfilter_ratings} WHERE questionid = :qid",
+            "SELECT AVG(stars) FROM {block_fragenfilter_ratings} WHERE questionid = :qid",
             ['qid' => $qid]
         );
         $cnt  = $DB->count_records('block_fragenfilter_ratings', ['questionid' => $qid]);
-        $mine = 0;
-
-        if ($userid) {
-            $mine = (int)($DB->get_field(
-                'block_fragenfilter_ratings',
-                'rating',
-                ['questionid' => $qid, 'userid' => $userid]
-            ) ?: 0);
-        } else if ($hash) {
-            $mine = (int)($DB->get_field(
-                'block_fragenfilter_ratings',
-                'rating',
-                ['questionid' => $qid, 'sessionhash' => $hash, 'userid' => null]
-            ) ?: 0);
-        }
+        $mine = (int)$DB->get_field(
+            'block_fragenfilter_ratings',
+            'stars',
+            ['questionid' => $qid, 'cookiehash' => $hash]
+        );
 
         return [
             'average'  => round($avg, 1),

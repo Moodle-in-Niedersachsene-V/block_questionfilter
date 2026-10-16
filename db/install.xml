@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="blocks/fragenfilter/db" VERSION="20260805" COMMENT="Question bank filter block database"
+<XMLDB PATH="blocks/fragenfilter/db" VERSION="20261016" COMMENT="Question bank filter block database"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd">
   <TABLES>
@@ -7,20 +7,16 @@
       <FIELDS>
         <FIELD NAME="id"           TYPE="int"  LENGTH="10" NOTNULL="true"  SEQUENCE="true"/>
         <FIELD NAME="questionid"   TYPE="int"  LENGTH="10" NOTNULL="true"  COMMENT="ID of the rated question"/>
-        <FIELD NAME="userid"       TYPE="int"  LENGTH="10" NOTNULL="false" COMMENT="NULL = guest rating"/>
-        <FIELD NAME="sessionhash"  TYPE="char" LENGTH="64" NOTNULL="false" COMMENT="SHA256-like hash for guests"/>
-        <FIELD NAME="rating"       TYPE="int"  LENGTH="1"  NOTNULL="true"  COMMENT="Rating 1-5"/>
+        <FIELD NAME="cookiehash"   TYPE="char" LENGTH="64" NOTNULL="false" COMMENT="Kursfilter cookie; NULL for unlinked legacy ratings"/>
+        <FIELD NAME="stars"       TYPE="int"  LENGTH="1"  NOTNULL="true"  COMMENT="Rating 1-5"/>
         <FIELD NAME="timecreated"  TYPE="int"  LENGTH="10" NOTNULL="true"/>
-        <FIELD NAME="timemodified" TYPE="int"  LENGTH="10" NOTNULL="true"/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary"    TYPE="primary" FIELDS="id"/>
         <KEY NAME="fk_question" TYPE="foreign" FIELDS="questionid" REFTABLE="question" REFFIELDS="id"/>
-        <KEY NAME="fk_user"     TYPE="foreign" FIELDS="userid"     REFTABLE="user"     REFFIELDS="id"/>
       </KEYS>
       <INDEXES>
-        <INDEX NAME="idx_userid_question"  UNIQUE="false" FIELDS="userid,questionid"/>
-        <INDEX NAME="idx_session_question" UNIQUE="false" FIELDS="sessionhash,questionid"/>
+        <INDEX NAME="question_cookie" UNIQUE="true" FIELDS="questionid,cookiehash"/>
       </INDEXES>
     </TABLE>
     <TABLE NAME="block_fragenfilter_tag_pending" COMMENT="AI-generated tag suggestions for questions (pending/applied/empty)">

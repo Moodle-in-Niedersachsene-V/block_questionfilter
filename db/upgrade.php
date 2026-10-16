@@ -119,5 +119,40 @@ function xmldb_block_fragenfilter_upgrade(int $oldversion): bool {
         upgrade_block_savepoint(true, 2026101603, 'fragenfilter');
     }
 
+    // Unlink legacy identities while preserving their stars and creation times (ADR 0003).
+    if ($oldversion < 2026101605) {
+        $table = new xmldb_table('block_fragenfilter_ratings');
+        $field = new xmldb_field('cookiehash', XMLDB_TYPE_CHAR, '64', null, null);
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        foreach (
+            [
+                new xmldb_index('idx_userid_question', XMLDB_INDEX_NOTUNIQUE, ['userid', 'questionid']),
+                new xmldb_index('idx_session_question', XMLDB_INDEX_NOTUNIQUE, ['sessionhash', 'questionid']),
+            ] as $index
+        ) {
+            if ($dbman->index_exists($table, $index)) {
+                $dbman->drop_index($table, $index);
+            }
+        }
+        $dbman->drop_key($table, new xmldb_key('fk_user', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']));
+        foreach (['userid', 'sessionhash', 'timemodified'] as $name) {
+            $field = new xmldb_field($name);
+            if ($dbman->field_exists($table, $field)) {
+                $dbman->drop_field($table, $field);
+            }
+        }
+        $field = new xmldb_field('rating', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL);
+        if ($dbman->field_exists($table, $field)) {
+            $dbman->rename_field($table, $field, 'stars');
+        }
+        $index = new xmldb_index('question_cookie', XMLDB_INDEX_UNIQUE, ['questionid', 'cookiehash']);
+        if (!$dbman->index_exists($table, $index)) {
+            $dbman->add_index($table, $index);
+        }
+        upgrade_block_savepoint(true, 2026101605, 'fragenfilter');
+    }
+
     return true;
 }
