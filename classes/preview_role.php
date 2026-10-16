@@ -90,7 +90,11 @@ final class preview_role {
         if (!self::is_pool_account($user)) {
             return;
         }
-        role_assign(self::ensure(), $user->id, \context_system::instance()->id);
+        $roleid = self::ensure();
+        $contextid = \context_system::instance()->id;
+        if (!user_has_role_assignment($user->id, $roleid, $contextid)) {
+            role_assign($roleid, $user->id, $contextid);
+        }
     }
 
     /**

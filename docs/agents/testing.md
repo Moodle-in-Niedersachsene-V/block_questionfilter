@@ -116,7 +116,7 @@ Exitverhalten des Gates, keine vollständige Wirksamkeit aller 23 Regeln.
 - `test_preview_of_an_unknown_question_takes_no_pool_account`.
 
 Belegung, IP-Grenze und Seitensperren testet der Kursfilter
-(`preview_starter_test`, `hook_callbacks_test`); Belege für #8 liegen unter
+(dort `preview_starter_test`, `hook_callbacks_test`); Belege für #8 liegen unter
 `/tmp/questionfilter-spec2-issue8/`. Der Kursfilter muss lokal in der Version von `main` stehen
 (`preview_starter::start(null, …)` seit Merge 811973e).
 

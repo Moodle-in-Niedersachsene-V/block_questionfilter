@@ -38,8 +38,7 @@ if (!data_submitted()) {
 require_sesskey();
 
 // The question must exist.
-$question = $DB->get_record('question', ['id' => $qid, 'parent' => 0], 'id, name', IGNORE_MISSING);
-if (!$question) {
+if (!$DB->record_exists('question', ['id' => $qid, 'parent' => 0])) {
     $PAGE->set_context(context_system::instance());
     $PAGE->set_url(new moodle_url('/blocks/questionfilter/guest_preview.php'));
     echo $OUTPUT->header();
@@ -52,7 +51,8 @@ if (!$question) {
 }
 
 $previewurl = new moodle_url('/question/bank/previewquestion/preview.php', ['id' => $qid]);
-$outcome = \block_kursfilter\preview_starter::start(null, isloggedin() && !isguestuser());
+$hasreallogin = isloggedin() && !isguestuser();
+$outcome = \block_kursfilter\preview_starter::start(null, $hasreallogin);
 
 $notices = [
     \block_kursfilter\preview_starter::POOL_FULL => 'preview_pool_full',
