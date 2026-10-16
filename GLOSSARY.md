@@ -41,6 +41,33 @@ Ein Exportformat (Moodle XML, CSV oder GIFT), einzeln aktivierbar.
 _Avoid_: Dateityp
 Code: `export format`
 
+## Besuch
+
+**Materialien-Hub**:
+Das Moodle des Vereins Moodle in Niedersachsen e. V., in dem Lehrkräfte Kurse und Fragen zur Nachnutzung finden; einziger Einsatzort des Fragenfilters.
+_Avoid_: Aufgabenpool, Vereins-Moodle
+Code: `materials hub`
+
+**Besucher**:
+Eine Person, die den Fragenfilter nutzt, mit oder ohne eigenes Moodle-Konto.
+_Avoid_: Gast, Nutzer
+Code: `visitor`
+
+**Pool-Konto**:
+Ein vom Kursfilter verwaltetes Moodle-Konto, das genau einem Besucher für eine Vorschau überlassen wird; danach darf der Besucher auch exportieren.
+_Avoid_: Pool-Nutzer, Gastnutzer, Gastkonto
+Code: `pool account`
+
+**Vorschau**:
+Der Blick eines Besuchers in eine Frage über ein Pool-Konto oder ein eigenes Konto.
+_Avoid_: Gast-Vorschau, Gast-Login
+Code: `preview`
+
+**Bewertung**:
+Eine Sternebewertung (1–5) eines Besuchers für eine Frage; höchstens eine je Besucher und Frage.
+_Avoid_: Rating, Stimme
+Code: `rating`
+
 ## Berechtigungen
 
 **Sichtbarkeit**:
