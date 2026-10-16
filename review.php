@@ -27,81 +27,37 @@ require_once(__DIR__ . '/../../config.php');
 require_login();
 require_capability('block/questionfilter:reviewtags', context_system::instance());
 
+require_once($CFG->libdir . '/questionlib.php');
+
+$action = optional_param('action', '', PARAM_ALPHA);
+$suggestionid = optional_param('id', 0, PARAM_INT);
+$perpage = max(1, min(100, optional_param('perpage', 50, PARAM_INT)));
+$page = max(0, optional_param('page', 0, PARAM_INT));
+
 $PAGE->set_url(new moodle_url('/blocks/questionfilter/review.php'));
 $PAGE->set_context(context_system::instance());
 $PAGE->set_title(get_string('review_title', 'block_questionfilter'));
 $PAGE->set_heading(get_string('review_title', 'block_questionfilter'));
 
-$action = optional_param('action', '', PARAM_ALPHA);
-
-// Process the action.
 if ($action) {
-    require_sesskey();
-    if ($action === 'approveall') {
-        $pending = $DB->get_records('block_questionfilter_tag_pending', ['status' => 'pending']);
-        $count = 0;
-        foreach ($pending as $row) {
-            $tags = array_filter(array_map('trim', explode(',', $row->tags)));
-            if (!empty($tags)) {
-                \block_questionfilter\task\generate_tags::apply_tags((int)$row->questionid, $tags);
-                $DB->set_field('block_questionfilter_tag_pending', 'status', 'applied', ['id' => $row->id]);
-                $count++;
-            }
-        }
-        \core\notification::success(
-            get_string('approved_all', 'block_questionfilter', $count)
-        );
-        redirect($PAGE->url);
-    }
-
-    if ($action === 'rejectall') {
-        $DB->set_field('block_questionfilter_tag_pending', 'status', 'rejected', ['status' => 'pending']);
-        \core\notification::info(get_string('rejected_all', 'block_questionfilter'));
-        redirect($PAGE->url);
-    }
-
-    // Single action.
-    $pendingid = optional_param('id', 0, PARAM_INT);
-    if ($pendingid) {
-        $pending = $DB->get_record(
-            'block_questionfilter_tag_pending',
-            ['id' => $pendingid, 'status' => 'pending'],
-            '*',
-            IGNORE_MISSING
-        );
-        if ($pending) {
-            if ($action === 'approve') {
-                $tags = array_filter(array_map('trim', explode(',', $pending->tags)));
-                \block_questionfilter\task\generate_tags::apply_tags((int)$pending->questionid, $tags);
-                $DB->set_field('block_questionfilter_tag_pending', 'status', 'applied', ['id' => $pendingid]);
-                \core\notification::success(get_string('approved', 'block_questionfilter'));
-            } else if ($action === 'reject') {
-                $DB->set_field('block_questionfilter_tag_pending', 'status', 'rejected', ['id' => $pendingid]);
-                \core\notification::info(get_string('rejected', 'block_questionfilter'));
-            }
-        }
-        redirect($PAGE->url);
+    if (!data_submitted()) {
+        throw new moodle_exception('error_review_needs_post', 'block_questionfilter');
     }
 }
 
-// Statistics.
-$totalcount    = $DB->count_records('block_questionfilter_tag_pending', ['status' => 'pending']);
-$appliedcount  = $DB->count_records('block_questionfilter_tag_pending', ['status' => 'applied']);
-$rejectedcount = $DB->count_records('block_questionfilter_tag_pending', ['status' => 'rejected']);
+$records = \block_questionfilter\suggestion_review::visible_records();
+$pending = \block_questionfilter\suggestion_review::pending($records);
 
-$perpage = optional_param('perpage', 50, PARAM_INT);
-$page    = optional_param('page', 0, PARAM_INT);
+if ($action) {
+    require_sesskey();
+    \block_questionfilter\suggestion_review::review($action, $pending, $suggestionid);
+    redirect($PAGE->url);
+}
 
-$pending = $DB->get_records_sql(
-    "SELECT p.*, q.name AS questionname, q.qtype
-       FROM {block_questionfilter_tag_pending} p
-       JOIN {question} q ON q.id = p.questionid
-      WHERE p.status = 'pending'
-   ORDER BY p.timecreated ASC",
-    [],
-    $page * $perpage,
-    $perpage
-);
+$totalcount = count($pending);
+$appliedcount = count(array_filter($records, static fn($row) => $row->status === 'applied'));
+$rejectedcount = count(array_filter($records, static fn($row) => $row->status === 'rejected'));
+$pending = array_slice($pending, $page * $perpage, $perpage, true);
 
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('review_title', 'block_questionfilter'));
@@ -146,21 +102,19 @@ if ($totalcount > 0) {
         'sesskey' => sesskey(),
     ]);
 
-    echo html_writer::div(
-        html_writer::link(
-            $approveallurl,
-            get_string('action_approveall', 'block_questionfilter', $totalcount),
-            ['class' => 'btn btn-success mr-2',
-             'onclick' => 'return confirm("' . s(get_string('confirm_approveall', 'block_questionfilter')) . '")']
-        )
-        . html_writer::link(
-            $rejectallurl,
-            get_string('action_rejectall', 'block_questionfilter'),
-            ['class' => 'btn btn-danger',
-             'onclick' => 'return confirm("' . s(get_string('confirm_rejectall', 'block_questionfilter')) . '")']
-        ),
-        'mb-3'
+    $approvebutton = new single_button(
+        $approveallurl,
+        get_string('action_approveall', 'block_questionfilter', $totalcount),
+        'post'
     );
+    $approvebutton->add_action(new confirm_action(get_string('confirm_approveall', 'block_questionfilter')));
+    $rejectbutton = new single_button(
+        $rejectallurl,
+        get_string('action_rejectall', 'block_questionfilter'),
+        'post'
+    );
+    $rejectbutton->add_action(new confirm_action(get_string('confirm_rejectall', 'block_questionfilter')));
+    echo html_writer::div($OUTPUT->render($approvebutton) . $OUTPUT->render($rejectbutton), 'mb-3');
 }
 
 if (empty($pending)) {
@@ -198,16 +152,8 @@ foreach ($pending as $row) {
         'sesskey' => sesskey(),
     ]);
 
-    $actions = html_writer::link(
-        $approveurl,
-        get_string('action_approve', 'block_questionfilter'),
-        ['class' => 'btn btn-sm btn-success mr-1']
-    );
-    $actions .= html_writer::link(
-        $rejecturl,
-        get_string('action_reject', 'block_questionfilter'),
-        ['class' => 'btn btn-sm btn-danger']
-    );
+    $actions = $OUTPUT->single_button($approveurl, get_string('action_approve', 'block_questionfilter'), 'post');
+    $actions .= $OUTPUT->single_button($rejecturl, get_string('action_reject', 'block_questionfilter'), 'post');
 
     $table->data[] = [
         s($row->questionname),

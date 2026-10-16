@@ -205,12 +205,11 @@ if ($ADMIN->fulltree) {
         get_string('settings_ai_claude_desc', 'block_questionfilter')
     ));
 
-    $settings->add(new admin_setting_configtext(
+    $settings->add(new admin_setting_configpasswordunmask(
         'block_questionfilter/ai_claude_apikey',
         get_string('settings_ai_claude_apikey', 'block_questionfilter'),
         get_string('settings_ai_claude_apikey_help', 'block_questionfilter'),
-        '',
-        PARAM_RAW
+        ''
     ));
 
     $settings->add(new admin_setting_configtext(

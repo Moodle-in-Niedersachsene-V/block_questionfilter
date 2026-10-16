@@ -35,6 +35,9 @@ final class request_test extends \advanced_testcase {
     /** @var string Cookie file for preview requests. */
     private string $cookiejar = '';
 
+    /** @var string Password unique to this test run. */
+    private string $password = '';
+
     /** @var bool Whether Moodle's test setup ran. */
     private bool $setupdone = false;
 
@@ -45,6 +48,7 @@ final class request_test extends \advanced_testcase {
         }
         parent::setUp();
         $this->setupdone = true;
+        $this->password = bin2hex(random_bytes(16));
         $this->resetAfterTest();
         // The materials hub exposes search to anonymous visitors.
         set_config('forcelogin', 0);
@@ -167,6 +171,155 @@ final class request_test extends \advanced_testcase {
             str_replace('\\/', '/', $body)
         );
         $this->assertSame(1, $DB->count_records('sessions', ['userid' => $pooluser->id]));
+    }
+
+    /**
+     * Logs a fixture user into the real HTTP session.
+     *
+     * @param \stdClass $user User with the test password.
+     * @return string Session key of the logged-in user.
+     */
+    private function login_reviewer(\stdClass $user): string {
+        $page = $this->preview_request([], false, '/login/index.php');
+        $this->assertSame(1, preg_match('/name="logintoken" value="([^"]+)"/', $page, $matches));
+        $this->preview_request([
+            'username' => $user->username,
+            'password' => $this->password,
+            'logintoken' => $matches[1],
+        ], true, '/login/index.php');
+        $page = $this->preview_request([], false, '/my/');
+        $this->assertSame(1, preg_match('/"sesskey":"([A-Za-z0-9]+)"/', $page, $matches));
+        return $matches[1];
+    }
+
+    public function test_review_requires_capability_post_and_sesskey_before_any_write(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        $user = $this->getDataGenerator()->create_user(['password' => $this->password]);
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category();
+        $question = $generator->create_question('truefalse', null, ['category' => $category->id]);
+        $pendingid = $DB->insert_record('block_questionfilter_tag_pending', (object)[
+            'questionid' => $question->id, 'tags' => 'Mathematik', 'status' => 'pending',
+            'timecreated' => time(), 'timemodified' => time(),
+        ]);
+        $anonymous = $this->preview_request([], false, '/blocks/questionfilter/review.php');
+        $this->assertStringNotContainsString('Mathematik', $anonymous);
+        $this->assertStringContainsString('/login/index.php', $anonymous);
+        $sesskey = $this->login_reviewer($user);
+        $before = [];
+        foreach (['block_questionfilter_tag_pending', 'tag', 'tag_instance', 'question'] as $table) {
+            $before[$table] = $DB->get_records($table, null, 'id');
+        }
+        $path = '/blocks/questionfilter/review.php';
+        foreach (['', 'approve', 'reject', 'approveall', 'rejectall'] as $action) {
+            $body = $this->preview_request(['action' => $action, 'id' => $pendingid, 'sesskey' => $sesskey], true, $path);
+            $this->assertStringNotContainsString('Mathematik', $body);
+            $this->assertStringContainsString(get_string('nopermissions', 'error', get_string(
+                'block_questionfilter:reviewtags',
+                'block_questionfilter'
+            )), $body);
+            foreach ($before as $table => $records) {
+                $this->assertEquals($records, $DB->get_records($table, null, 'id'), $table);
+            }
+        }
+
+        $role = $this->getDataGenerator()->create_role();
+        foreach (['block/questionfilter:reviewtags', 'moodle/question:viewall', 'moodle/question:tagall'] as $capability) {
+            assign_capability($capability, CAP_ALLOW, $role, \context_system::instance());
+        }
+        role_assign($role, $user->id, \context_system::instance());
+        foreach (['approve', 'reject', 'approveall', 'rejectall'] as $action) {
+            foreach ([[false, $sesskey], [true, null], [true, 'wrong12345']] as [$post, $key]) {
+                $fields = ['action' => $action, 'id' => $pendingid];
+                if ($key !== null) {
+                    $fields['sesskey'] = $key;
+                }
+                $this->preview_request($fields, $post, $path);
+                foreach ($before as $table => $records) {
+                    $this->assertEquals($records, $DB->get_records($table, null, 'id'), "$action changed $table");
+                }
+            }
+        }
+        $body = $this->preview_request([], false, $path);
+        $this->assertStringContainsString('Mathematik', $body);
+        $this->assertStringContainsString('method="post"', $body);
+        $this->preview_request(['action' => 'approve', 'id' => $pendingid, 'sesskey' => $sesskey], true, $path);
+        $this->assertSame('applied', $DB->get_field('block_questionfilter_tag_pending', 'status', ['id' => $pendingid]));
+        $this->assertSame(['Mathematik'], array_values(\core_tag_tag::get_item_tags_array(
+            'core_question',
+            'question',
+            $question->id
+        )));
+    }
+
+    public function test_review_masks_suggestions_and_restricts_single_and_bulk_actions_to_allowed_questions(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        $user = $this->getDataGenerator()->create_user(['password' => $this->password]);
+        $course = $this->getDataGenerator()->create_course();
+        $context = \context_course::instance($course->id);
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category(['contextid' => $context->id]);
+        $own = $generator->create_question('truefalse', null, [
+            'category' => $category->id, 'createdby' => $user->id,
+        ]);
+        $foreign = $generator->create_question('truefalse', null, ['category' => $category->id]);
+        $hiddencategory = $generator->create_question_category();
+        $hidden = $generator->create_question('truefalse', null, ['category' => $hiddencategory->id]);
+        $script = '<script>alert(1)</script>';
+        $ids = [];
+        foreach ([$own->id, $foreign->id, $hidden->id, 999999999] as $questionid) {
+            $ids[$questionid] = $DB->insert_record('block_questionfilter_tag_pending', (object)[
+                'questionid' => $questionid, 'tags' => $script, 'status' => 'pending',
+                'timecreated' => time(), 'timemodified' => time(),
+            ]);
+        }
+        \core_tag_tag::set_item_tags('core_question', 'question', $own->id, $context, ['Existing']);
+        $role = $this->getDataGenerator()->create_role();
+        assign_capability('block/questionfilter:reviewtags', CAP_ALLOW, $role, \context_system::instance());
+        role_assign($role, $user->id, \context_system::instance());
+        // Ownership permits tagging only the reviewer's own question, even with viewall.
+        assign_capability('moodle/question:viewall', CAP_ALLOW, $role, $context);
+        assign_capability('moodle/question:tagmine', CAP_ALLOW, $role, $context);
+        $sesskey = $this->login_reviewer($user);
+        $path = '/blocks/questionfilter/review.php';
+        $page = $this->preview_request([], false, $path);
+        $this->assertStringContainsString(s($script), $page);
+        $this->assertStringNotContainsString($script, $page);
+        foreach ([$foreign->id, $hidden->id, 999999999] as $questionid) {
+            $before = [];
+            foreach (['block_questionfilter_tag_pending', 'tag', 'tag_instance'] as $table) {
+                $before[$table] = $DB->get_records($table, null, 'id');
+            }
+            foreach (['approve', 'reject'] as $action) {
+                $page = $this->preview_request([
+                    'action' => $action, 'id' => $ids[$questionid], 'sesskey' => $sesskey,
+                ], true, $path);
+                $this->assertStringContainsString(get_string('error_review_unavailable', 'block_questionfilter'), $page);
+                foreach ($before as $table => $records) {
+                    $this->assertEquals($records, $DB->get_records($table, null, 'id'), $table);
+                }
+            }
+        }
+        foreach (['reject', 'approveall', 'rejectall'] as $action) {
+            $DB->set_field('block_questionfilter_tag_pending', 'status', 'pending', ['id' => $ids[$own->id]]);
+            $this->preview_request(['action' => $action, 'id' => $ids[$own->id], 'sesskey' => $sesskey], true, $path);
+            $expected = $action === 'approveall' ? 'applied' : 'rejected';
+            $this->assertSame($expected, $DB->get_field('block_questionfilter_tag_pending', 'status', ['id' => $ids[$own->id]]));
+            foreach ([$foreign->id, $hidden->id, 999999999] as $questionid) {
+                $this->assertSame(
+                    'pending',
+                    $DB->get_field('block_questionfilter_tag_pending', 'status', ['id' => $ids[$questionid]])
+                );
+            }
+        }
+        $this->assertContains('Existing', \core_tag_tag::get_item_tags_array('core_question', 'question', $own->id));
+        // A stale pending ID cannot be applied again.
+        $this->preview_request(['action' => 'approve', 'id' => $ids[$own->id], 'sesskey' => $sesskey], true, $path);
+        $this->assertSame('rejected', $DB->get_field('block_questionfilter_tag_pending', 'status', ['id' => $ids[$own->id]]));
     }
 
     public function test_anonymous_search_returns_a_visible_question(): void {

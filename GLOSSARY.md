@@ -74,3 +74,15 @@ Code: `rating`
 Welche Fragen ein Nutzer sehen darf, geregelt über die Moodle-Capabilities `question:viewmine` und `question:viewall`.
 _Avoid_: Rechte bei der Suche
 Code: `visibility`
+
+## KI-Verschlagwortung
+
+**Tag-Vorschlag**:
+Ein von der KI erzeugter Tag-Satz für eine Frage, der mit Status `pending` (offen), `applied` (übernommen), `rejected` (verworfen) oder `empty` (kein Tag) gespeichert wird.
+_Avoid_: Tag-Kandidat, KI-Tag
+Code: `suggestion`
+
+**Prüfung**:
+Die Freigabe oder Ablehnung eines Tag-Vorschlags durch eine berechtigte Person (`reviewtags`); jede Prüfung löst ein Ereignis aus.
+_Avoid_: Review, Moderation
+Code: `suggestion_review`, Ereignis `suggestion_reviewed`

@@ -68,7 +68,10 @@ class generate_tags extends \core\task\scheduled_task {
         }
 
         $autoapply = (bool)get_config('block_questionfilter', 'ai_autoapply');
-        $batchsize = (int)(get_config('block_questionfilter', 'ai_batch_size') ?: self::DEFAULT_BATCH_SIZE);
+        $batchsize = max(1, min(
+            self::DEFAULT_BATCH_SIZE,
+            (int)(get_config('block_questionfilter', 'ai_batch_size') ?: self::DEFAULT_BATCH_SIZE)
+        ));
         $connector = new ai_connector();
 
         $questions = self::next_questions($batchsize);
@@ -160,8 +163,8 @@ class generate_tags extends \core\task\scheduled_task {
     /**
      * Writes approved tags directly into Moodle's question tag system.
      *
-     * Tags are attached to the question_bank_entry (Moodle 4.x+) with the
-     * correct category context, so they appear in the question bank UI.
+     * Existing tags are preserved. The caller authorises either manual review
+     * or the administrator-enabled scheduled task before calling this method.
      *
      * @param int      $questionid Question ID (mdl_question.id).
      * @param string[] $tags       Tag values to write.
@@ -169,38 +172,18 @@ class generate_tags extends \core\task\scheduled_task {
     public static function apply_tags(int $questionid, array $tags): void {
         global $DB;
 
-        // Moodle 4.x+ stores question tags on question_bank_entries.
-        $qbe = $DB->get_record_sql(
-            "SELECT qbe.id, qc.contextid
-               FROM {question_bank_entries} qbe
-               JOIN {question_versions} qv  ON qv.questionbankentryid = qbe.id
+        $question = $DB->get_record_sql(
+            "SELECT q.id, qc.contextid
+               FROM {question} q
+               JOIN {question_versions} qv ON qv.questionid = q.id
+               JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
                JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
-              WHERE qv.questionid = :qid
-           ORDER BY qv.version DESC",
+              WHERE q.id = :qid",
             ['qid' => $questionid],
-            IGNORE_MULTIPLE
+            MUST_EXIST
         );
-
-        if (!$qbe) {
-            debugging(
-                'block_questionfilter generate_tags::apply_tags(): '
-                    . 'question_bank_entry not found for question ' . $questionid,
-                DEBUG_DEVELOPER
-            );
-            return;
-        }
-
-        $context = \context::instance_by_id($qbe->contextid, IGNORE_MISSING);
-        if (!$context) {
-            $context = \context_system::instance();
-        }
-
-        \core_tag_tag::set_item_tags(
-            'core_question',
-            'question_bank_entry',
-            (int)$qbe->id,
-            $context,
-            $tags
-        );
+        $context = \context::instance_by_id($question->contextid);
+        $existing = \core_tag_tag::get_item_tags_array('core_question', 'question', $questionid);
+        \core_tag_tag::set_item_tags('core_question', 'question', $questionid, $context, array_merge($existing, $tags));
     }
 }

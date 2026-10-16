@@ -104,3 +104,27 @@ prüft GET ohne, mit falschem und mit gültigem Sesskey sowie POST ohne/mit fals
 Pool-Anmeldung und unveränderte Nutzer-, Fragen-, Bewertungs- und Tag-Daten.
 Der Gegenfall POST mit gültigem Sesskey startet die Vorschau und meldet das
 Pool-Konto an. Pool-Belegung und Fragen-Sichtbarkeit bleiben eigene Fälle (#8/#9).
+
+## KI-Prüfseite und Connector (#12)
+
+Die Suite prüft die Prüfseite mit echter Moodle-Anmeldung über HTTP: kein
+`reviewtags`, GET mit gültigem Sesskey, POST ohne/falschen Sesskey und fremde,
+verwaiste oder bereits bearbeitete Vorschlags-IDs dürfen keine Pending-/Tag-Daten
+ändern. Zulässige Einzel-/Sammelaktionen, `tagmine` samt Eigentümergrenze,
+Erhaltung bestehender Tags und maskierte Skriptvorschläge gehören zu den Gegenfällen.
+
+`ai_connector_test` startet eigene kurzlebige HTTP-/TLS-Systempeers über `proc_open`
+mit einem Argumentarray ohne Shell. PHP CLI und OpenSSL müssen verfügbar sein;
+keine externen KI-Konten oder API-Schlüssel werden verwendet. Die Peers stehen nur
+mit gesetzter Testprozess-Umgebung zur Verfügung. Geprüft werden der öffentliche
+Connector und der Task mit realer Moodle-Datenbank: 16-KiB-Request-/Streaminglimit,
+normaler/ungültiger JSON-Inhalt, Redirect-/HTTP-Fehler, Moodle-Hostblockade,
+unvertrautes und explizit vertrautes TLS-Zertifikat sowie ein echter 30-Sekunden-
+Timeout. Deshalb dauert die Suite mindestens 30 Sekunden. Der Test-CA-Bundle
+liegt nur vorübergehend im isolierten PHPUnit-Datenverzeichnis. Keine private
+Helper-Methode wird direkt getestet. Die gemeinsame Transportgrenze wird über
+Ollama geprüft; ein realer Anthropic-Aufruf ist kein lokaler Nachweis.
+
+Entwicklungsbelege, Rot-/Grün-Läufe, Gate-/Vollscan und Reviewprotokolle:
+`/tmp/questionfilter-spec2-issue12/`. CI für den finalen Commit bleibt ein
+zusätzlicher Pflichtnachweis, insbesondere Moodle 5.1 mit MariaDB.
