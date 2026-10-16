@@ -201,3 +201,22 @@ dauerhafte ignorierte Sicherung `.issue10-evidence.tar.gz` und `.issue10-resume.
 Nicht getestet: Export/Löschung der Logstore-Zeilen (Logstore-Plugin), Cache-Ablauf und ein realer KI-Aufruf.
 
 Belege: `/tmp/questionfilter-spec2-issue11/`.
+
+## Sichtbarkeit, Debug-Ausgabe und Profilsperre (#13)
+
+- `guest_preview.php` und `rate_question` verlangen `question_visibility::is_visible()` (bereit, keine Unterfrage, für den Aufrufer sichtbar wie in der Suche). Unbekannte und nicht sichtbare Fragen nehmen kein Pool-Konto und ändern keine Anmeldung (`test_preview_of_a_question_the_visitor_cannot_see_takes_no_pool_account`, `test_preview_of_a_question_a_real_account_cannot_see_keeps_the_login_and_skips_the_preview`) und speichern keine Bewertung (`test_rating_rejects_invalid_requests_without_changing_domain_data`, einschließlich manipulierter Parametertypen). Testfixtures machen eine Kategorie über `make_category_visible()` für Gast und Standardnutzer sichtbar.
+- Die Request-Tests laufen mit Entwickler-Debugging (`debug`, `debugdisplay`) und prüfen jede Seitenantwort (`preview_request`) auf Debug-Meldungen und angezeigte PHP-Hinweise. AJAX-Antworten sind ausgenommen: Moodle zeigt dort nie Debugging an (`NO_DEBUG_DISPLAY`). Die Tests laufen mit dem Tabellenpräfix `phpu_` statt `mdl_`.
+- `test_pool_account_is_kept_off_profile_pages_and_a_real_account_is_not` prüft die Profilsperre des Kursfilters in der kombinierten Installation. Die Sperre selbst gehört dem Kursfilter.
+
+## Release (#13)
+
+Reihenfolge nach Vereins-Arbeitsablauf: Entwicklung abschließen, `moodle-plugin-ci phpcbf` (muss „No violations“ melden), erst danach die Build-Nummer `YYYYMMDDNN` in `version.php` setzen, Moodle-Upgrade, alle Checks und Suiten, Semgrep-Gate, CI. Jede Codeänderung danach verlangt eine neue Build-Nummer und einen neuen Durchlauf.
+
+Paket aus dem geprüften Commit (Zip-Name `<Komponente>_<Build>.zip`, Wurzelverzeichnis `fragenfilter/` wie das Blockverzeichnis; Repo-Werkzeuge ohne Laufzeitwirkung bleiben draußen, ebenso `docs/`, damit kein veralteter Fallplan im Paket liegt). Das Paket wird nicht committet:
+
+```bash
+git archive --format=zip --prefix=fragenfilter/ -o /tmp/block_fragenfilter_<build>.zip <commit> \
+  -- . ':(exclude).github' ':(exclude).semgrepignore' ':(exclude)AGENTS.md' ':(exclude)CLAUDE.md' ':(exclude)docs'
+```
+
+Installationsnachweis in einer frischen, isolierten Moodle-Instanz (eigene Datenbank, eigenes Datenverzeichnis, `block_kursfilter` von `main`): Zip nach `public/blocks/` entpacken, `admin/cli/install_database.php`, danach `admin/cli/upgrade.php` ohne Fehler und `core_plugin_manager` meldet `block_fragenfilter` mit der Build-Nummer.

@@ -111,7 +111,6 @@ final class request_test extends \advanced_testcase {
         });
         $body = curl_exec($ch);
         $this->assertNotFalse($body, 'Test web server not reachable: ' . curl_error($ch));
-        $this->assert_no_debug_output($body);
         $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         curl_close($ch);
         $this->assertSame(200, $status, $body);
@@ -299,13 +298,15 @@ final class request_test extends \advanced_testcase {
     }
 
     /**
-     * Fails if a response carries a Moodle debugging message or a displayed PHP notice or warning.
+     * Fails if a page response carries a Moodle debugging message or a displayed PHP notice or warning.
+     *
+     * AJAX responses are not checked: Moodle never displays debugging there (NO_DEBUG_DISPLAY).
      *
      * @param string $body Response body.
      */
     private function assert_no_debug_output(string $body): void {
         $this->assertDoesNotMatchRegularExpression(
-            '/debuggingmessage|\b(?:Notice|Warning|Deprecated)\b:[^\n]* on line \d+/',
+            '/debuggingmessage|\b(?:Notice|Warning|Deprecated)\b(?:<\/b>)?:[^\n]* on line \d+/',
             $body,
             'The response contains debugging output.'
         );
