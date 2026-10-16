@@ -47,6 +47,10 @@ function block_questionfilter_setup_preview_role(): void {
     $roleshortname = 'questionfilter_preview';
     $sysctx        = context_system::instance();
 
+    // Waehrend der Installation sind die Capabilities aus db/access.php noch
+    // nicht in der Datenbank; ohne diesen Schritt bricht assign_capability() ab.
+    update_capabilities('block_questionfilter');
+
     // Rolle anlegen oder vorhandene verwenden.
     $role = $DB->get_record('role', ['shortname' => $roleshortname]);
     if (!$role) {
