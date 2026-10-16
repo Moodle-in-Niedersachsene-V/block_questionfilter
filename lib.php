@@ -47,24 +47,33 @@ function block_fragenfilter_pluginfile(
     $forcedownload,
     array $options = []
 ): void {
+    global $USER, $SESSION;
+
     require_login();
 
-    if ($filearea !== 'export') {
+    if ($filearea !== 'export' || $context->contextlevel !== CONTEXT_SYSTEM) {
         send_file_not_found();
     }
 
-    if (!has_capability('moodle/question:viewall', context_system::instance())) {
+    if (!has_capability('block/fragenfilter:export', context_system::instance())) {
         send_file_not_found();
     }
 
     $itemid = array_shift($args);
+    if ((int)$itemid !== (int)$USER->id || count($args) !== 1 || isguestuser()) {
+        send_file_not_found();
+    }
     $filename = array_pop($args);
     $filepath = $args ? '/' . implode('/', $args) . '/' : '/';
 
     $fs = get_file_storage();
     $file = $fs->get_file($context->id, 'block_fragenfilter', 'export', $itemid, $filepath, $filename);
 
-    if (!$file) {
+    if (
+        !$file || (int)$file->get_userid() !== (int)$USER->id || $file->is_directory() ||
+        empty($SESSION->fragenfilter_export_token) ||
+        !hash_equals($SESSION->fragenfilter_export_token, (string)$file->get_source())
+    ) {
         send_file_not_found();
     }
 

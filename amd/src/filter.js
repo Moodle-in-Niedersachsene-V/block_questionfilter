@@ -279,7 +279,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
                 self.config.canexport = result.canexport;
                 self.config.isloggedin = result.isloggedin;
                 // Use the export formats resolved by the server.
-                var fmtStr = result.exportformats || self.config.exportformats || 'xml,csv,gift';
+                var fmtStr = result.exportformats;
                 var formats = fmtStr.split(',').map(function(s) {
                     return s.trim();
                 });

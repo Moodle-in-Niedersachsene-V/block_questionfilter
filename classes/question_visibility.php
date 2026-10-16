@@ -1,0 +1,160 @@
+<?php
+// This file is part of Moodle - https://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+
+namespace block_fragenfilter;
+
+/**
+ * Resolves question visibility before queries apply result limits.
+ *
+ * @package block_fragenfilter
+ * @copyright 2026 Moodle in Niedersachsen e. V.
+ * @license https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+final class question_visibility {
+    /**
+     * SQL predicate for the question (q) and category (qc) aliases.
+     *
+     * @param string $scope Search scope.
+     * @param int $contextid Current context.
+     * @return array SQL predicate and named parameters.
+     */
+    public static function sql(string $scope, int $contextid): array {
+        global $DB, $USER;
+
+        if (!in_array($scope, ['all', 'course', 'system'], true)) {
+            throw new \invalid_parameter_exception('Unknown search scope.');
+        }
+        $user = isloggedin() ? $USER : guest_user();
+        $all = [];
+        $mine = [];
+        foreach (self::contextids($scope, $contextid) as $id) {
+            $context = \context::instance_by_id($id);
+            if (has_capability('moodle/question:viewall', $context, $user)) {
+                $all[] = $id;
+            } else if (has_capability('moodle/question:viewmine', $context, $user)) {
+                $mine[] = $id;
+            }
+        }
+        $clauses = [];
+        $args = [];
+        if ($all) {
+            [$insql, $params] = $DB->get_in_or_equal($all, SQL_PARAMS_NAMED, 'viewall');
+            $clauses[] = "qc.contextid $insql";
+            $args += $params;
+        }
+        if ($mine) {
+            [$insql, $params] = $DB->get_in_or_equal($mine, SQL_PARAMS_NAMED, 'viewmine');
+            $clauses[] = "(qc.contextid $insql AND q.createdby = :viewer)";
+            $args += $params;
+            $args['viewer'] = $user->id;
+        }
+        return [$clauses ? '(' . implode(' OR ', $clauses) . ')' : '1 = 0', $args];
+    }
+
+    /**
+     * Resolves all searchable context IDs for the given scope.
+     *
+     * Moodle 4.x:  Questions belong to course and system contexts.
+     * Moodle 5.0+: Question banks are standalone mod_qbank activities.
+     *                           Each question bank has its own CONTEXT_MODULE context.
+     *                           Each course also has an automatically migrated
+     *                           "shared question bank" as another mod_qbank instance.
+     *
+     * Scopes:
+     * - 'system' : system context only
+     * - 'course' : current course context (+ its mod_qbank contexts in Moodle 5)
+     * - 'all'    : system + all courses + all mod_qbank contexts (Moodle 5)
+     *
+     * @param string $scope Search scope: all, course or system.
+     * @param int $contextid Current context ID.
+     * @return array Context IDs.
+     */
+    private static function contextids(string $scope, int $contextid): array {
+        global $DB, $CFG;
+
+        $sysctx = \context_system::instance();
+        $ismoodle5 = (int)$CFG->version >= 2024100700; // Corresponds to Moodle 5.0.
+
+        if ($scope === 'system') {
+            return [$sysctx->id];
+        }
+
+        if ($scope === 'course') {
+            $ctx = $contextid > 0
+                ? (\context::instance_by_id($contextid, IGNORE_MISSING) ?? $sysctx)
+                : $sysctx;
+            $coursectx = $ctx->get_course_context(false);
+            $ids = $coursectx ? [$coursectx->id] : [];
+
+            // Moodle 5+: include the course's mod_qbank contexts.
+            if ($ismoodle5 && $coursectx) {
+                $qbankctxids = self::get_qbank_module_contextids($coursectx->instanceid);
+                $ids = array_unique(array_merge($ids, $qbankctxids));
+            }
+            return $ids;
+        }
+
+        // The all scope includes the system context and all course contexts.
+        $coursectxids = $DB->get_fieldset_sql(
+            "SELECT id FROM {context} WHERE contextlevel = :lvl",
+            ['lvl' => CONTEXT_COURSE]
+        );
+        $ids = array_merge([$sysctx->id], $coursectxids);
+
+        // Moodle 5+: include all mod_qbank module contexts site-wide.
+        if ($ismoodle5) {
+            $qbankctxids = self::get_qbank_module_contextids(null);
+            $ids = array_unique(array_merge($ids, $qbankctxids));
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Returns all CONTEXT_MODULE contexts belonging to mod_qbank instances.
+     * $courseid = null  → site-wide
+     * $courseid = int   → this course only
+     *
+     * Moodle 5.0+ stores question banks as mod_qbank activities.
+     * Question categories belong to the module context (contextlevel = 70).
+     *
+     * @param int|null $courseid Course ID or null for all courses.
+     * @return array Context IDs.
+     */
+    private static function get_qbank_module_contextids(?int $courseid): array {
+        global $DB;
+
+        // Mod_qbank only exists in Moodle 5+; check whether the module is available.
+        if (!$DB->get_record('modules', ['name' => 'qbank'], 'id', IGNORE_MISSING)) {
+            return [];
+        }
+
+        $sql = "SELECT ctx.id
+                   FROM {context} ctx
+                   JOIN {course_modules} cm ON cm.id = ctx.instanceid
+                   JOIN {modules} m ON m.id = cm.module
+                  WHERE ctx.contextlevel = :ctxlvl
+                    AND m.name = 'qbank'";
+        $args = ['ctxlvl' => CONTEXT_MODULE];
+
+        if ($courseid !== null) {
+            $sql  .= " AND cm.course = :courseid";
+            $args['courseid'] = $courseid;
+        }
+
+        return $DB->get_fieldset_sql($sql, $args) ?: [];
+    }
+}

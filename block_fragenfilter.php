@@ -95,7 +95,7 @@ class block_fragenfilter extends block_base {
 
         // Check export permission and pass it to JavaScript.
         // Recalculate each time so pool accounts see the correct buttons after login.
-        $canexport = has_capability('block/fragenfilter:export', context_system::instance());
+        $canexport = isloggedin() && !isguestuser() && has_capability('block/fragenfilter:export', context_system::instance());
 
         // Load the AMD module.
         $this->page->requires->js_call_amd('block_fragenfilter/filter', 'init', [
@@ -103,12 +103,7 @@ class block_fragenfilter extends block_base {
                 'blockid' => (int)$this->instance->id,
                 'contextid' => (int)$this->page->context->id,
                 'searchscope' => get_config('block_fragenfilter', 'searchscope') ?: 'all',
-                'exportformats' => (function () {
-                    $fmt = get_config('block_fragenfilter', 'exportformats');
-                    return is_array($fmt)
-                        ? (implode(',', array_keys(array_filter($fmt))) ?: 'xml,csv,gift')
-                        : ($fmt ?: 'xml,csv,gift');
-                })(),
+                'exportformats' => implode(',', \block_fragenfilter\question_export::enabled_formats()),
                 'qtypessource' => get_config('block_fragenfilter', 'questiontypes_source') ?: 'installed',
                 'wwwroot' => $CFG->wwwroot,
                 'canexport' => $canexport,

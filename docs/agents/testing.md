@@ -98,6 +98,25 @@ Scans und den Plugin-Scan mit JSON-Bericht, Logs und getrennten Exitdateien aus.
 Die Fixtures werden nur gescannt, nie als PHP ausgeführt. Sie prüfen Auswahl und
 Exitverhalten des Gates, keine vollständige Wirksamkeit aller 23 Regeln.
 
+## Suche und Export (#9)
+
+`search_export_test` prüft die externe API: `viewmine`/`viewall` in System-, Kurs-
+und Modulkontexten, alle Suchbereiche, Metadaten ohne Fragen-/Blockrechte,
+Sonderzeichen einschließlich Backslash und LIKE-Wildcards, Eigentümer-/Tagfilter
+vor dem Ergebnislimit sowie ungültige IDs und maximal 200 Such-/Exportfragen.
+Die XML-/CSV-/GIFT-Inhalte einer Beispielfrage werden aus der erzeugten Datei geprüft.
+
+Die Request-Suite prüft den anonymen Export nach öffentlicher Suche, den erlaubten
+Pool-Export samt Download, fremde/gemischte IDs und deaktivierte/unbekannte Formate
+ohne Fachdaten-/Dateiänderung. Downloads werden zusätzlich gegen fremde Konten,
+eine neue Sitzung desselben Kontos, Kontextmanipulation und Traversierung geprüft.
+Pool-Konten werden wiederverwendet; deshalb gehört eine Exportdatei sowohl zum
+Konto als auch zur erzeugenden Browsersitzung. Ein weiterer Export ersetzt die
+vorherige Datei dieses Kontos. Kein Browser-XSS-Test, kein Test aller Fragetypen.
+
+Neue lokale Belege: `/tmp/questionfilter-spec2-issue9/`, Zuordnung und Grenzen im
+[Fallplan](../fallplan.md). Die CI bleibt für die vereinbarte Datenbankmatrix nötig.
+
 ## Vorschau-Start (#7, #8)
 
 `request_test` prüft den Vorschau-Einstieg `guest_preview.php` gegen den echten Webserver:

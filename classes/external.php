@@ -79,6 +79,34 @@ class block_fragenfilter_external extends external_api {
     }
 
     /**
+     * Validates the caller context without retaining an anonymous guest login.
+     *
+     * @param int $contextid Caller context.
+     * @return context Validated context.
+     */
+    private static function validate_search_context(int $contextid): context {
+        global $USER;
+
+        $context = context::instance_by_id($contextid, MUST_EXIST);
+        $anonymous = !isloggedin();
+        $originaluser = clone $USER;
+        if ($anonymous) {
+            \core\session\manager::set_user(guest_user());
+        }
+        try {
+            self::validate_context($context);
+            if (!has_capability('block/fragenfilter:view', context_system::instance())) {
+                throw new moodle_exception('nopermission', 'block_fragenfilter');
+            }
+        } finally {
+            if ($anonymous) {
+                \core\session\manager::set_user($originaluser);
+            }
+        }
+        return $context;
+    }
+
+    /**
      * Describes the search parameters.
      *
      * @return external_function_parameters Parameter definition.
@@ -99,6 +127,7 @@ class block_fragenfilter_external extends external_api {
     /**
      * Searches questions using the given filters.
      *
+     * Context and block access are checked by validate_search_context().
      * @param string $search Free-text search term.
      * @param string $categories Comma-separated category IDs; empty means all.
      * @param string $types Comma-separated question types.
@@ -108,7 +137,7 @@ class block_fragenfilter_external extends external_api {
      * @param int $contextid Current context ID.
      * @param int $limit Maximum number of results.
      * @return array Matching questions.
-     */
+     * nosemgrep: moodle-external-ohne-kontextpruefung */
     public static function search_questions(
         string $search,
         string $categories,
@@ -133,44 +162,17 @@ class block_fragenfilter_external extends external_api {
         ]);
 
         // Cap the limit at the configured maximum (DoS protection).
-        $maxlimit = (int)(get_config('block_fragenfilter', 'resultlimit') ?: 200);
+        $maxlimit = max(1, min(self::MAX_RESULT_LIMIT, (int)(get_config('block_fragenfilter', 'resultlimit') ?: 200)));
         if ($params['limit'] < 1 || $params['limit'] > $maxlimit) {
             $params['limit'] = $maxlimit;
         }
 
-        // Check the dedicated capability, which can be granted to guests.
-        $context = $params['contextid'] > 0
-            ? context::instance_by_id($params['contextid'], IGNORE_MISSING) ?? context_system::instance()
-            : context_system::instance();
-        // Public search validates guest access without retaining a guest login.
-        $anonymous = !isloggedin();
-        $originaluser = clone $USER;
-        if ($anonymous) {
-            \core\session\manager::set_user(guest_user());
-        }
-        try {
-            self::validate_context($context);
-        } finally {
-            if ($anonymous) {
-                \core\session\manager::set_user($originaluser);
-            }
-        }
-
-        if (!has_capability('block/fragenfilter:view', context_system::instance())) {
-            throw new moodle_exception('nopermission', 'block_fragenfilter');
-        }
+        $context = self::validate_search_context($params['contextid']);
 
         // Rate limit: at most RATE_LIMIT_REQUESTS per user within RATE_LIMIT_WINDOW seconds.
         self::check_rate_limit((int)$USER->id);
 
-        // Collect contexts according to the search scope.
-        $contextids = self::get_searchable_contextids($params['scope'], $params['contextid']);
-
-        if (empty($contextids)) {
-            return ['questions' => [], 'total' => 0];
-        }
-
-        [$ctxsql, $ctxargs] = $DB->get_in_or_equal($contextids, SQL_PARAMS_NAMED, 'ctx');
+        [$visibilitysql, $ctxargs] = \block_fragenfilter\question_visibility::sql($params['scope'], $context->id);
 
         // Base query joining question and question_categories.
         $sql = "SELECT DISTINCT q.id, q.name, q.qtype, q.createdby,
@@ -182,15 +184,15 @@ class block_fragenfilter_external extends external_api {
                   JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
                  WHERE q.parent = 0
                    AND qv.status = 'ready'
-                   AND qc.contextid $ctxsql";
+                   AND $visibilitysql";
 
         $queryargs = $ctxargs;
 
         // Free-text search: question title OR tags.
         if (!empty($params['search'])) {
-            $searchparam = '%' . $DB->sql_like_escape($params['search']) . '%';
+            $searchparam = '%' . $DB->sql_like_escape(str_replace('!', '!!', $params['search']), '!') . '%';
             $sql .= " AND (
-                " . $DB->sql_like('q.name', ':searchname', false) . "
+                " . $DB->sql_like('q.name', ':searchname', false, true, false, '!') . "
                 OR EXISTS (
                     SELECT 1
                       FROM {tag_instance} ti
@@ -198,7 +200,7 @@ class block_fragenfilter_external extends external_api {
                      WHERE ti.itemid = q.id
                        AND ti.itemtype = 'question'
                        AND ti.component = 'core_question'
-                       AND " . $DB->sql_like('t.name', ':searchtag', false) . "
+                       AND " . $DB->sql_like('t.name', ':searchtag', false, true, false, '!') . "
                 )
             )";
             $queryargs['searchname'] = $searchparam;
@@ -217,7 +219,10 @@ class block_fragenfilter_external extends external_api {
 
         // Category filter.
         if (!empty($params['categories'])) {
-            $catids = array_filter(array_map('intval', explode(',', $params['categories'])));
+            if (!preg_match('/^[1-9][0-9]*(,[1-9][0-9]*)*$/D', $params['categories'])) {
+                throw new invalid_parameter_exception('Expected positive category IDs.');
+            }
+            $catids = array_map('intval', explode(',', $params['categories']));
             if ($catids) {
                 [$catsql, $catargs] = $DB->get_in_or_equal($catids, SQL_PARAMS_NAMED, 'cat');
                 $sql .= " AND qbe.questioncategoryid $catsql";
@@ -225,57 +230,23 @@ class block_fragenfilter_external extends external_api {
             }
         }
 
-        $sql .= " ORDER BY qc.name, q.name";
-
-        $rows = $DB->get_records_sql($sql, $queryargs, 0, $params['limit'] + 1);
-
-        // Filter tags (including difficulty) in PHP because Moodle tags are flexible.
         $alltags = array_filter(array_map('trim', explode(',', $params['tags'])));
         if (!empty($params['difficulty'])) {
             $alltags[] = trim($params['difficulty']);
         }
-
+        foreach (array_values($alltags) as $index => $tag) {
+            $placeholder = 'filtertag' . $index;
+            $sql .= " AND EXISTS (
+                SELECT 1 FROM {tag_instance} ti JOIN {tag} t ON t.id = ti.tagid
+                 WHERE ti.itemid = q.id AND ti.itemtype = 'question' AND ti.component = 'core_question'
+                   AND " . $DB->sql_like('t.name', ':' . $placeholder, false, true, false, '!') . ")";
+            $queryargs[$placeholder] = '%' . $DB->sql_like_escape(str_replace('!', '!!', $tag), '!') . '%';
+        }
+        $sql .= " ORDER BY qc.name, q.name";
+        $rows = $DB->get_records_sql($sql, $queryargs, 0, $params['limit']);
         $questions = [];
         foreach ($rows as $row) {
             $qtags = self::get_question_tags((int)$row->id);
-
-            // Apply the tag filter.
-            if (!empty($alltags)) {
-                $tagnames = array_map('strtolower', array_column($qtags, 'name'));
-                $match = true;
-                foreach ($alltags as $filtertag) {
-                    $found = false;
-                    foreach ($tagnames as $tn) {
-                        if (strpos($tn, strtolower($filtertag)) !== false) {
-                            $found = true;
-                            break;
-                        }
-                    }
-                    if (!$found) {
-                        $match = false;
-                        break;
-                    }
-                }
-                if (!$match) {
-                    continue;
-                }
-            }
-
-            // Also search tags for the free-text term.
-            if (!empty($params['search'])) {
-                $tagnames = array_map('strtolower', array_column($qtags, 'name'));
-                $intitle = stripos($row->name, $params['search']) !== false;
-                $intag = false;
-                foreach ($tagnames as $tn) {
-                    if (strpos($tn, strtolower($params['search'])) !== false) {
-                        $intag = true;
-                        break;
-                    }
-                }
-                if (!$intitle && !$intag) {
-                    continue;
-                }
-            }
 
             $questions[] = [
                 'id' => (int)$row->id,
@@ -286,10 +257,6 @@ class block_fragenfilter_external extends external_api {
                 'contextid' => (int)$row->categorycontextid,
                 'tags' => $qtags,
             ];
-
-            if (count($questions) >= $params['limit']) {
-                break;
-            }
         }
 
         return [
@@ -340,10 +307,11 @@ class block_fragenfilter_external extends external_api {
     /**
      * Loads all searchable question categories.
      *
+     * Context and block access are checked by validate_search_context().
      * @param string $scope Search scope: all, course or system.
      * @param int $contextid Current context ID.
      * @return array Categories.
-     */
+     * nosemgrep: moodle-external-ohne-kontextpruefung */
     public static function get_categories(string $scope, int $contextid): array {
         global $DB;
 
@@ -351,28 +319,18 @@ class block_fragenfilter_external extends external_api {
             self::get_categories_parameters(),
             ['scope' => $scope, 'contextid' => $contextid]
         );
-        $context = $params['contextid'] > 0
-            ? context::instance_by_id($params['contextid'], IGNORE_MISSING) ?? context_system::instance()
-            : context_system::instance();
-        self::validate_context($context);
+        $context = self::validate_search_context($params['contextid']);
 
-        if (!has_capability('block/fragenfilter:view', context_system::instance())) {
-            throw new moodle_exception('nopermission', 'block_fragenfilter');
-        }
-
-        $contextids = self::get_searchable_contextids($params['scope'], $params['contextid']);
-        if (empty($contextids)) {
-            return ['categories' => []];
-        }
-
-        [$ctxsql, $ctxargs] = $DB->get_in_or_equal($contextids, SQL_PARAMS_NAMED, 'ctx');
+        [$visibilitysql, $ctxargs] = \block_fragenfilter\question_visibility::sql($params['scope'], $context->id);
         $rows = $DB->get_records_sql(
             "SELECT qc.id, qc.name, qc.contextid, ctx.contextlevel,
-                    ctx.instanceid, COUNT(qbe.id) AS questioncount
+                    ctx.instanceid, COUNT(q.id) AS questioncount
                FROM {question_categories} qc
                JOIN {context} ctx ON ctx.id = qc.contextid
-          LEFT JOIN {question_bank_entries} qbe ON qbe.questioncategoryid = qc.id
-              WHERE qc.contextid $ctxsql
+               JOIN {question_bank_entries} qbe ON qbe.questioncategoryid = qc.id
+               JOIN {question_versions} qv ON qv.questionbankentryid = qbe.id
+               JOIN {question} q ON q.id = qv.questionid
+              WHERE $visibilitysql AND q.parent = 0 AND qv.status = 'ready'
            GROUP BY qc.id, qc.name, qc.contextid, ctx.contextlevel, ctx.instanceid
            ORDER BY qc.name",
             $ctxargs
@@ -425,11 +383,12 @@ class block_fragenfilter_external extends external_api {
     /**
      * Loads the available question types.
      *
+     * Context and block access are checked by validate_search_context().
      * @param string $scope Search scope: all, course or system.
      * @param int $contextid Current context ID.
      * @param string $source Source: installed or existing.
      * @return array Question types.
-     */
+     * nosemgrep: moodle-external-ohne-kontextpruefung */
     public static function get_questiontypes(string $scope, int $contextid, string $source = 'installed'): array {
         global $DB, $CFG;
 
@@ -437,13 +396,13 @@ class block_fragenfilter_external extends external_api {
             self::get_questiontypes_parameters(),
             ['scope' => $scope, 'contextid' => $contextid, 'source' => $source]
         );
-        $context = $params['contextid'] > 0
-            ? context::instance_by_id($params['contextid'], IGNORE_MISSING) ?? context_system::instance()
-            : context_system::instance();
-        self::validate_context($context);
+        $context = self::validate_search_context($params['contextid']);
 
-        if (!has_capability('block/fragenfilter:view', context_system::instance())) {
-            throw new moodle_exception('nopermission', 'block_fragenfilter');
+        if (
+            !in_array($params['scope'], ['all', 'course', 'system'], true) ||
+                !in_array($params['source'], ['installed', 'existing'], true)
+        ) {
+            throw new invalid_parameter_exception('Unknown search scope or question type source.');
         }
 
         $qtypes = [];
@@ -466,19 +425,14 @@ class block_fragenfilter_external extends external_api {
             }
         } else {
             // Only types actually present in the question bank.
-            $contextids = self::get_searchable_contextids($params['scope'], $params['contextid']);
-            if (empty($contextids)) {
-                return ['qtypes' => []];
-            }
-
-            [$ctxsql, $ctxargs] = $DB->get_in_or_equal($contextids, SQL_PARAMS_NAMED, 'ctx');
+            [$visibilitysql, $ctxargs] = \block_fragenfilter\question_visibility::sql($params['scope'], $context->id);
             $rows = $DB->get_records_sql(
                 "SELECT DISTINCT q.qtype
                    FROM {question} q
                    JOIN {question_versions} qv       ON qv.questionid        = q.id
                    JOIN {question_bank_entries} qbe   ON qbe.id              = qv.questionbankentryid
                    JOIN {question_categories} qc      ON qc.id               = qbe.questioncategoryid
-                  WHERE qc.contextid $ctxsql
+                  WHERE $visibilitysql
                     AND q.parent = 0
                     AND qv.status = 'ready'
                ORDER BY q.qtype",
@@ -553,65 +507,11 @@ class block_fragenfilter_external extends external_api {
         self::validate_context($context);
 
         // Export requires a dedicated capability, unavailable to guests.
-        if (!has_capability('block/fragenfilter:export', context_system::instance())) {
+        if (!isloggedin() || isguestuser() || !has_capability('block/fragenfilter:export', context_system::instance())) {
             throw new moodle_exception('nopermission', 'block_fragenfilter');
         }
 
-        $ids = array_filter(array_map('intval', explode(',', $params['questionids'])));
-        if (empty($ids)) {
-            throw new moodle_exception('noquestionsselected', 'block_fragenfilter');
-        }
-
-        require_once($CFG->libdir . '/questionlib.php');
-
-        switch ($params['format']) {
-            case 'csv':
-                $content = self::export_csv($ids);
-                $filename = 'questions_' . date('Ymd_His') . '.csv';
-                $mimetype = 'text/csv';
-                break;
-            case 'gift':
-                $content = self::export_gift($ids);
-                $filename = 'questions_' . date('Ymd_His') . '.txt';
-                $mimetype = 'text/plain';
-                break;
-            default:
-                $content = self::export_moodle_xml($ids);
-                $filename = 'questions_' . date('Ymd_His') . '.xml';
-                $mimetype = 'application/xml';
-                break;
-        }
-
-        // Store the file in Moodle's temporary area and return its URL.
-        $fs = get_file_storage();
-        $sysctx = context_system::instance();
-        $fs->delete_area_files($sysctx->id, 'block_fragenfilter', 'export', $params['contextid']);
-
-        $fileinfo = [
-            'contextid' => $sysctx->id,
-            'component' => 'block_fragenfilter',
-            'filearea' => 'export',
-            'itemid' => $params['contextid'],
-            'filepath' => '/',
-            'filename' => $filename,
-        ];
-        $file = $fs->create_file_from_string($fileinfo, $content);
-        $url = moodle_url::make_pluginfile_url(
-            $sysctx->id,
-            'block_fragenfilter',
-            'export',
-            $params['contextid'],
-            '/',
-            $filename
-        )->out(false);
-
-        return [
-            'success' => true,
-            'url' => $url,
-            'filename' => $filename,
-            'mimetype' => $mimetype,
-            'count' => count($ids),
-        ];
+        return \block_fragenfilter\question_export::create($params['questionids'], $params['format'], $params['contextid']);
     }
 
     /**
@@ -627,100 +527,6 @@ class block_fragenfilter_external extends external_api {
             'mimetype' => new external_value(PARAM_TEXT),
             'count' => new external_value(PARAM_INT),
         ]);
-    }
-
-    /**
-     * Resolves all searchable context IDs for the given scope.
-     *
-     * Moodle 4.x:  Questions belong to course and system contexts.
-     * Moodle 5.0+: Question banks are standalone mod_qbank activities.
-     *                           Each question bank has its own CONTEXT_MODULE context.
-     *                           Each course also has an automatically migrated
-     *                           "shared question bank" as another mod_qbank instance.
-     *
-     * Scopes:
-     * - 'system' : system context only
-     * - 'course' : current course context (+ its mod_qbank contexts in Moodle 5)
-     * - 'all'    : system + all courses + all mod_qbank contexts (Moodle 5)
-     *
-     * @param string $scope Search scope: all, course or system.
-     * @param int $contextid Current context ID.
-     * @return array Context IDs.
-     */
-    private static function get_searchable_contextids(string $scope, int $contextid): array {
-        global $DB, $CFG;
-
-        $sysctx = context_system::instance();
-        $ismoodle5 = (int)$CFG->version >= 2024100700; // Corresponds to Moodle 5.0.
-
-        if ($scope === 'system') {
-            return [$sysctx->id];
-        }
-
-        if ($scope === 'course') {
-            $ctx = $contextid > 0
-                ? (context::instance_by_id($contextid, IGNORE_MISSING) ?? $sysctx)
-                : $sysctx;
-            $coursectx = $ctx->get_course_context(false);
-            $ids = $coursectx ? [$coursectx->id, $sysctx->id] : [$sysctx->id];
-
-            // Moodle 5+: include the course's mod_qbank contexts.
-            if ($ismoodle5 && $coursectx) {
-                $qbankctxids = self::get_qbank_module_contextids($coursectx->instanceid);
-                $ids = array_unique(array_merge($ids, $qbankctxids));
-            }
-            return $ids;
-        }
-
-        // The all scope includes the system context and all course contexts.
-        $coursectxids = $DB->get_fieldset_sql(
-            "SELECT id FROM {context} WHERE contextlevel = :lvl",
-            ['lvl' => CONTEXT_COURSE]
-        );
-        $ids = array_merge([$sysctx->id], $coursectxids);
-
-        // Moodle 5+: include all mod_qbank module contexts site-wide.
-        if ($ismoodle5) {
-            $qbankctxids = self::get_qbank_module_contextids(null);
-            $ids = array_unique(array_merge($ids, $qbankctxids));
-        }
-
-        return $ids;
-    }
-
-    /**
-     * Returns all CONTEXT_MODULE contexts belonging to mod_qbank instances.
-     * $courseid = null  → site-wide
-     * $courseid = int   → this course only
-     *
-     * Moodle 5.0+ stores question banks as mod_qbank activities.
-     * Question categories belong to the module context (contextlevel = 70).
-     *
-     * @param int|null $courseid Course ID or null for all courses.
-     * @return array Context IDs.
-     */
-    private static function get_qbank_module_contextids(?int $courseid): array {
-        global $DB;
-
-        // Mod_qbank only exists in Moodle 5+; check whether the module is available.
-        if (!$DB->get_record('modules', ['name' => 'qbank'], 'id', IGNORE_MISSING)) {
-            return [];
-        }
-
-        $sql = "SELECT ctx.id
-                   FROM {context} ctx
-                   JOIN {course_modules} cm ON cm.id = ctx.instanceid
-                   JOIN {modules} m ON m.id = cm.module
-                  WHERE ctx.contextlevel = :ctxlvl
-                    AND m.name = 'qbank'";
-        $args = ['ctxlvl' => CONTEXT_MODULE];
-
-        if ($courseid !== null) {
-            $sql  .= " AND cm.course = :courseid";
-            $args['courseid'] = $courseid;
-        }
-
-        return $DB->get_fieldset_sql($sql, $args) ?: [];
     }
 
     /**
@@ -802,222 +608,6 @@ class block_fragenfilter_external extends external_api {
         }
     }
 
-    /**
-     * Exports Moodle XML through the native qformat_xml engine.
-     *
-     * qformat_xml::exportprocess() expects questions in the old stdClass format
-     * (as read from the DB), not question_definition objects from load_question().
-     * get_question_options() loads answers, hints and subquestions (multianswer)
-     * directly into the stdClass, as required for export.
-     *
-     * @param array $ids Question IDs.
-     * @return string Export file contents.
-     */
-    private static function export_moodle_xml(array $ids): string {
-        global $CFG, $DB;
-
-        require_once($CFG->libdir . '/questionlib.php');
-        require_once($CFG->dirroot . '/question/format.php');
-        require_once($CFG->dirroot . '/question/format/xml/format.php');
-
-        // Load questions as raw DB records (stdClass, not question_definition).
-        [$insql, $args] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'qid');
-        $rows = $DB->get_records_sql(
-            "SELECT q.*, qc.id AS category
-               FROM {question} q
-               JOIN {question_versions} qv  ON qv.questionid        = q.id
-               JOIN {question_bank_entries} qbe ON qbe.id           = qv.questionbankentryid
-               JOIN {question_categories} qc    ON qc.id            = qbe.questioncategoryid
-              WHERE q.id $insql
-                AND q.parent = 0",
-            $args
-        );
-
-        if (empty($rows)) {
-            return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<quiz>\n</quiz>\n";
-        }
-
-        // Get_question_options() populates each question with answers, hints,
-        // and, for qtype_multianswer, subquestions as stdClass objects.
-        // qtype must explicitly be a string because qformat_xml internally
-        // calls (string)$q->qtype, which throws a PHP exception for objects.
-        $sysctx = context_system::instance();
-        $questions = [];
-        foreach ($rows as $q) {
-            $q->qtype = (string)$q->qtype; // Ensure qtype is a string.
-            $q->category = (int)$q->category;
-            get_question_options($q); // Populate $q with answers and hints.
-            // Also normalise multianswer subquestions.
-            if ($q->qtype === 'multianswer' && !empty($q->options->questions)) {
-                foreach ($q->options->questions as $sub) {
-                    if (is_object($sub)) {
-                        $sub->qtype = (string)($sub->qtype ?? 'shortanswer');
-                    }
-                }
-            }
-            $questions[] = $q;
-        }
-
-        // Call writequestion() for each question instead of exportprocess().
-        // exportprocess() reads category contexts from the DB and internally calls
-        // context::instance_by_id(), which throws an exception for invalid context IDs.
-        // Calling writequestion() per question avoids that code path
-        // entirely.
-        $qformat = new qformat_xml();
-        $qformat->setContexts([$sysctx]);
-        $qformat->setCattofile(false);
-        $qformat->setContexttofile(false);
-
-        $xmlparts = [];
-        foreach ($questions as $q) {
-            try {
-                $part = $qformat->writequestion($q);
-                if ($part !== false && $part !== '') {
-                    $xmlparts[] = $part;
-                }
-            } catch (Exception $e) {
-                // Skip unsupported question types.
-                debugging(
-                    'XML export skipped question ' . $q->id . ': ' . $e->getMessage(),
-                    DEBUG_DEVELOPER
-                );
-            }
-        }
-
-        $content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<quiz>\n"
-            . implode('', $xmlparts)
-            . "</quiz>\n";
-
-        return $content;
-    }
-
-    /**
-     * Exports CSV: ID, name, type, category, tags.
-     * RFC 4180-compliant quoting (escape double quotes).
-     *
-     * @param array $ids Question IDs.
-     * @return string Export file contents.
-     */
-    private static function export_csv(array $ids): string {
-        global $DB;
-
-        [$insql, $args] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'q');
-        $questions = $DB->get_records_sql(
-            "SELECT q.id, q.name, q.qtype, qc.name AS categoryname
-               FROM {question} q
-               JOIN {question_versions} qv ON qv.questionid = q.id
-               JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
-               JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
-              WHERE q.id $insql",
-            $args
-        );
-
-        $csvquote = function (string $s): string {
-            return '"' . str_replace('"', '""', $s) . '"';
-        };
-
-        $lines = [implode(',', array_map($csvquote, ['ID', 'Name', 'Typ', 'Kategorie', 'Tags']))];
-        foreach ($questions as $q) {
-            $tags = self::get_question_tags((int)$q->id);
-            $tagstr = implode('; ', array_column($tags, 'name'));
-            $lines[] = implode(',', [
-                $csvquote((string)$q->id),
-                $csvquote($q->name),
-                $csvquote($q->qtype),
-                $csvquote($q->categoryname),
-                $csvquote($tagstr),
-            ]);
-        }
-        return implode("\r\n", $lines);
-    }
-
-    /**
-     * Exports GIFT through Moodle's native qformat_gift engine.
-     * Uses raw DB records (stdClass), like the XML export,
-     * because qformat_gift::writequestion() expects stdClass, not question_definition.
-     *
-     * @param array $ids Question IDs.
-     * @return string Export file contents.
-     */
-    private static function export_gift(array $ids): string {
-        global $CFG, $DB;
-
-        $giftformatfile = $CFG->dirroot . '/question/format/gift/format.php';
-
-        if (file_exists($giftformatfile)) {
-            require_once($CFG->libdir . '/questionlib.php');
-            require_once($CFG->dirroot . '/question/format.php');
-            require_once($giftformatfile);
-
-            // Load raw DB records (stdClass), just like the XML export.
-            [$insql, $args] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'qid');
-            $rows = $DB->get_records_sql(
-                "SELECT q.*, qc.id AS category
-                   FROM {question} q
-                   JOIN {question_versions} qv      ON qv.questionid        = q.id
-                   JOIN {question_bank_entries} qbe  ON qbe.id              = qv.questionbankentryid
-                   JOIN {question_categories} qc     ON qc.id               = qbe.questioncategoryid
-                  WHERE q.id $insql
-                    AND q.parent = 0",
-                $args
-            );
-
-            if (!empty($rows)) {
-                $qformat = new qformat_gift();
-                $qformat->setContexts([context_system::instance()]);
-                $qformat->setCattofile(false);
-                $qformat->setContexttofile(false);
-
-                $output = '// GIFT Export – ' . date('Y-m-d H:i:s') . "\n\n";
-                foreach ($rows as $q) {
-                    $q->qtype = (string)$q->qtype;
-                    try {
-                        get_question_options($q);
-                        // Normalise multianswer subquestions.
-                        if ($q->qtype === 'multianswer' && !empty($q->options->questions)) {
-                            foreach ($q->options->questions as $sub) {
-                                if (is_object($sub)) {
-                                    $sub->qtype = (string)($sub->qtype ?? 'shortanswer');
-                                }
-                            }
-                        }
-                        $line = $qformat->writequestion($q);
-                        if ($line) {
-                            $output .= $line . "\n";
-                        }
-                    } catch (Exception $e) {
-                        // Skip unsupported question types (e.g. ordering).
-                        debugging(
-                            'GIFT export skipped question ' . $q->id . ': ' . $e->getMessage(),
-                            DEBUG_DEVELOPER
-                        );
-                    }
-                }
-                return $output;
-            }
-        }
-
-        // Fallback: plain text when qformat_gift is unavailable.
-        [$insql, $args] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'q');
-        $questions = $DB->get_records_sql(
-            "SELECT q.id, q.name, q.qtype, q.questiontext, qc.name AS categoryname
-               FROM {question} q
-               JOIN {question_versions} qv ON qv.questionid = q.id
-               JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
-               JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
-              WHERE q.id $insql",
-            $args
-        );
-
-        $out = '// GIFT Export – ' . date('Y-m-d H:i:s') . "\n\n";
-        foreach ($questions as $q) {
-            $text = strip_tags($q->questiontext ?? '');
-            $out .= "// Kategorie: {$q->categoryname} | Typ: {$q->qtype}\n";
-            $out .= "::{$q->name}::{$text} {}\n\n";
-        }
-        return $out;
-    }
-
     // ---------------------------------------------------------------
     // Check_capabilities: check the current user's capabilities.
 
@@ -1035,32 +625,23 @@ class block_fragenfilter_external extends external_api {
      * Called via AJAX after pool login so JS can show or hide
      * the export buttons accordingly.
      *
+     * Context and block access are checked by validate_search_context().
      * @param int $contextid Context ID.
      * @return array Capabilities as a boolean map.
-     */
+     * nosemgrep: moodle-external-ohne-kontextpruefung */
     public static function check_capabilities(int $contextid): array {
         $params  = self::validate_parameters(
             self::check_capabilities_parameters(),
             ['contextid' => $contextid]
         );
 
-        // Use the system context because context::instance_by_id() would throw
-        // an exception for contextid=0 or an invalid value.
+        self::validate_search_context($params['contextid']);
         $sysctx = context_system::instance();
-        self::validate_context($sysctx);
 
-        $fmtconfig = get_config('block_fragenfilter', 'exportformats');
-        if (is_array($fmtconfig)) {
-            $formats = implode(',', array_keys(array_filter($fmtconfig)));
-        } else {
-            $formats = 'xml,csv,gift';
-        }
-        if (empty($formats)) {
-            $formats = 'xml,csv,gift';
-        }
+        $formats = implode(',', \block_fragenfilter\question_export::enabled_formats());
 
         return [
-            'canexport'     => has_capability('block/fragenfilter:export', $sysctx),
+            'canexport'     => isloggedin() && !isguestuser() && has_capability('block/fragenfilter:export', $sysctx),
             'canpreview'    => isloggedin() && !isguestuser(),
             'isloggedin'    => isloggedin() && !isguestuser(),
             'exportformats' => $formats,
@@ -1380,6 +961,7 @@ class block_fragenfilter_external extends external_api {
     /**
      * Loads question text and answer options for the preview.
      *
+     * Context and block access are checked by validate_search_context().
      * Returns the question text as sanitised HTML and
      * answer options for multiple-choice questions. Available to all
      * users with block/fragenfilter:view, including guests.
@@ -1387,7 +969,7 @@ class block_fragenfilter_external extends external_api {
      * @param int $questionid Question ID.
      * @param int $contextid  Current context.
      * @return array Question text, type and answer options.
-     */
+     * nosemgrep: moodle-external-ohne-kontextpruefung */
     public static function get_question_preview(int $questionid, int $contextid): array {
         global $CFG, $DB;
 
@@ -1396,126 +978,12 @@ class block_fragenfilter_external extends external_api {
             'contextid'  => $contextid,
         ]);
 
-        $context = $params['contextid'] > 0
-            ? context::instance_by_id($params['contextid'], IGNORE_MISSING) ?? context_system::instance()
-            : context_system::instance();
-        self::validate_context($context);
-
-        if (!has_capability('block/fragenfilter:view', context_system::instance())) {
+        $context = self::validate_search_context($params['contextid']);
+        if (!isloggedin() || isguestuser()) {
             throw new moodle_exception('nopermission', 'block_fragenfilter');
         }
 
-        $qid = (int)$params['questionid'];
-
-        // Load the question's base data.
-        $q = $DB->get_record('question', ['id' => $qid, 'parent' => 0], '*', MUST_EXIST);
-
-        // Sanitise question text (HTML allowed, but only safe tags).
-        require_once($CFG->libdir . '/weblib.php');
-        $sysctx     = context_system::instance();
-        $questiontext = format_text($q->questiontext, $q->questiontextformat, [
-            'context' => $sysctx,
-            'noclean' => false,
-            'filter'  => false,
-        ]);
-
-        // Remove general feedback fields to avoid spoilers.
-        $result = [
-            'questionid'   => $qid,
-            'qtype'        => $q->qtype,
-            'name'         => $q->name,
-            'questiontext' => $questiontext,
-            'answers'      => [],
-            'hinttext'     => '',
-        ];
-
-        // Load answer options according to the question type.
-        switch ($q->qtype) {
-            case 'multichoice':
-                $answers = $DB->get_records(
-                    'question_answers',
-                    ['question' => $qid],
-                    'fraction DESC, id ASC'
-                );
-                foreach ($answers as $a) {
-                    $result['answers'][] = [
-                        'text'    => format_text($a->answer, $a->answerformat, [
-                            'context' => $sysctx,
-                            'noclean' => false,
-                            'filter'  => false,
-                        ]),
-                        'correct' => ($a->fraction > 0),
-                    ];
-                }
-                break;
-
-            case 'truefalse':
-                $answers = $DB->get_records(
-                    'question_answers',
-                    ['question' => $qid],
-                    'id ASC'
-                );
-                foreach ($answers as $a) {
-                    $result['answers'][] = [
-                        'text'    => $a->answer === 'True' ? get_string('true', 'qtype_truefalse')
-                                                            : get_string('false', 'qtype_truefalse'),
-                        'correct' => ($a->fraction > 0),
-                    ];
-                }
-                break;
-
-            case 'shortanswer':
-                // Show only the first model answer to avoid a full spoiler.
-                $answer = $DB->get_record_sql(
-                    "SELECT answer FROM {question_answers}
-                      WHERE question = :qid
-                   ORDER BY fraction DESC, id ASC",
-                    ['qid' => $qid],
-                    IGNORE_MULTIPLE
-                );
-                if ($answer) {
-                    $result['hinttext'] = get_string('preview_expectedanswer', 'block_fragenfilter')
-                        . ': ' . s($answer->answer);
-                }
-                break;
-
-            case 'numerical':
-                $answer = $DB->get_record_sql(
-                    "SELECT answer, tolerance FROM {question_answers}
-                      WHERE question = :qid
-                   ORDER BY fraction DESC, id ASC",
-                    ['qid' => $qid],
-                    IGNORE_MULTIPLE
-                );
-                if ($answer) {
-                    $result['hinttext'] = get_string('preview_expectedanswer', 'block_fragenfilter')
-                        . ': ' . s($answer->answer)
-                        . ($answer->tolerance > 0 ? ' ± ' . s($answer->tolerance) : '');
-                }
-                break;
-
-            case 'match':
-                $subquestions = $DB->get_records(
-                    'qtype_match_subquestions',
-                    ['questionid' => $qid],
-                    'id ASC'
-                );
-                foreach ($subquestions as $sub) {
-                    if (!empty($sub->questiontext)) {
-                        $result['answers'][] = [
-                            'text'    => s($sub->questiontext) . ' → ' . s($sub->answertext),
-                            'correct' => true,
-                        ];
-                    }
-                }
-                break;
-
-            default:
-                // Show only the question text for all other types.
-                break;
-        }
-
-        return $result;
+        return \block_fragenfilter\question_preview::get($params['questionid'], $context->id);
     }
 
     /**

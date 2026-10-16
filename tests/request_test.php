@@ -76,15 +76,18 @@ final class request_test extends \advanced_testcase {
      * Calls AJAX without a login, cookie or session key.
      *
      * @param array $requests AJAX batch with registered functions and arguments.
+     * @param string $sesskey Optional authenticated visitor session key.
      * @return array Decoded AJAX responses.
      */
-    private function ajax(array $requests): array {
+    private function ajax(array $requests, string $sesskey = ''): array {
         // Commit fixtures through Moodle's public test API before the separate process reads them.
         $this->preventResetByRollback();
-        $ch = curl_init($this->baseurl . '/lib/ajax/service.php');
+        $ch = curl_init($this->baseurl . '/lib/ajax/service.php' . ($sesskey ? '?sesskey=' . $sesskey : ''));
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => json_encode($requests),
+            CURLOPT_COOKIEFILE => $sesskey ? $this->cookiejar : '',
+            CURLOPT_COOKIEJAR => $sesskey ? $this->cookiejar : '',
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 30,
@@ -129,6 +132,7 @@ final class request_test extends \advanced_testcase {
             CURLOPT_COOKIEFILE => $this->cookiejar,
             CURLOPT_COOKIEJAR => $this->cookiejar,
             CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_PATH_AS_IS => true,
             CURLOPT_TIMEOUT => 30,
         ]);
         if ($post) {
@@ -519,6 +523,12 @@ final class request_test extends \advanced_testcase {
             'name' => 'Visible tracer question',
         ]);
 
+        assign_capability(
+            'moodle/question:viewall',
+            CAP_ALLOW,
+            get_config('core', 'guestroleid'),
+            $category->contextid
+        );
         $result = $this->ajax([[
             'index' => 0,
             'methodname' => 'block_fragenfilter_search_questions',
@@ -566,5 +576,102 @@ final class request_test extends \advanced_testcase {
         foreach ($tables as $table) {
             $this->assertEquals($before[$table], $DB->get_records($table, null, 'id'), $table . ' changed.');
         }
+    }
+    public function test_pool_export_checks_each_question_format_and_download_owner(): void {
+        global $DB;
+
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category();
+        $question = $generator->create_question('truefalse', null, [
+            'category' => $category->id, 'name' => 'Allowed export example',
+        ]);
+        $hiddencategory = $generator->create_question_category();
+        $hidden = $generator->create_question('truefalse', null, [
+            'category' => $hiddencategory->id, 'name' => 'Secret export example',
+        ]);
+        $role = $DB->get_field('role', 'id', ['shortname' => preview_role::SHORTNAME], MUST_EXIST);
+        assign_capability('moodle/question:viewall', CAP_ALLOW, $role, $category->contextid);
+        set_config('exportformats', 'csv', 'block_fragenfilter');
+        $sesskey = $this->visitor_sesskey();
+        $body = $this->preview_request(['qid' => $question->id, 'sesskey' => $sesskey], true);
+        $this->assertStringContainsString('qf_pool_login_done', $body);
+        $sesskey = $this->visitor_sesskey();
+        $contextid = \context_system::instance()->id;
+        $args = ['questionids' => (string)$question->id, 'format' => 'csv', 'contextid' => $contextid];
+        $call = fn($args) => $this->ajax([[
+            'index' => 0, 'methodname' => 'block_fragenfilter_export_questions', 'args' => $args,
+        ]], $sesskey)[0];
+        $result = $call($args);
+        $this->assertFalse($result['error'], json_encode($result));
+        $this->assertSame(1, $result['data']['count']);
+        $url = $result['data']['url'];
+        $path = substr($url, strlen($this->baseurl));
+        $download = $this->preview_request([], false, $path);
+        $this->assertStringContainsString('Allowed export example', $download);
+        $this->assertStringNotContainsString('Secret export example', $download);
+        $before = [];
+        foreach (['question', 'question_answers', 'block_fragenfilter_ratings', 'files'] as $table) {
+            $before[$table] = $DB->get_records($table, null, 'id');
+        }
+        foreach (
+            [
+            array_replace($args, ['questionids' => (string)$hidden->id]),
+            array_replace($args, ['questionids' => $question->id . ',' . $hidden->id, 'contextid' => $category->contextid]),
+            array_replace($args, ['format' => 'xml']),
+            array_replace($args, ['format' => 'unknown']),
+            ] as $invalid
+        ) {
+            $rejected = $call($invalid);
+            $this->assertTrue($rejected['error'], json_encode($rejected));
+            $this->assertArrayNotHasKey('data', $rejected);
+            foreach ($before as $table => $records) {
+                $this->assertEquals($records, $DB->get_records($table, null, 'id'), $table);
+            }
+        }
+        // Use the authorised session so an unrelated owner check cannot hide a broken path check.
+        $this->assertStringContainsString('Allowed export example', $this->preview_request([], false, $path));
+        $this->assertNotSame($contextid, (int)$category->contextid);
+        $this->assertStringNotContainsString('Allowed export example', $this->preview_request(
+            [],
+            false,
+            str_replace('/pluginfile.php/' . $contextid . '/', '/pluginfile.php/' . $category->contextid . '/', $path)
+        ));
+        $this->assertStringNotContainsString('Allowed export example', $this->preview_request(
+            [],
+            false,
+            str_replace('/questions_', '/../questions_', $path)
+        ));
+        // A separate visitor cannot retrieve the first visitor's export.
+        $this->cookiejar = '';
+        $this->assertStringNotContainsString('Allowed export example', $this->preview_request([], false, $path));
+        $other = $this->getDataGenerator()->create_user(['password' => $this->password]);
+        role_assign($role, $other->id, $contextid);
+        $this->login_reviewer($other);
+        $this->assertStringNotContainsString('Allowed export example', $this->preview_request([], false, $path));
+    }
+    public function test_export_download_is_bound_to_the_exporting_session(): void {
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category();
+        $question = $generator->create_question('truefalse', null, [
+            'category' => $category->id, 'name' => 'Session private export',
+        ]);
+        $user = $this->getDataGenerator()->create_user(['password' => $this->password]);
+        $role = create_role('Session exporter', 'sessionexporter', '');
+        assign_capability('block/fragenfilter:export', CAP_ALLOW, $role, 1);
+        assign_capability('moodle/question:viewall', CAP_ALLOW, $role, $category->contextid);
+        role_assign($role, $user->id, 1);
+        $sesskey = $this->login_reviewer($user);
+        $result = $this->ajax([[
+            'index' => 0, 'methodname' => 'block_fragenfilter_export_questions',
+            'args' => ['questionids' => (string)$question->id, 'format' => 'csv', 'contextid' => 1],
+        ]], $sesskey)[0];
+        $this->assertFalse($result['error'], json_encode($result));
+        $path = substr($result['data']['url'], strlen($this->baseurl));
+        $this->assertStringContainsString('Session private export', $this->preview_request([], false, $path));
+        $this->cookiejar = '';
+        $this->login_reviewer($user);
+        $this->assertStringNotContainsString('Session private export', $this->preview_request([], false, $path));
     }
 }
