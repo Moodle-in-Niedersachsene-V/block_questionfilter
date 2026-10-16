@@ -18,7 +18,7 @@
  * Post-Installationsschritte fuer block_questionfilter.
  *
  * Legt die systemweite Rolle "Fragenvorschau-Gast" an und
- * weist sie allen kursfilter_guest*-Pool-Nutzern zu, damit
+ * weist sie allen kursfilter_pool*-Pool-Nutzern zu, damit
  * diese die Moodle-Fragenvorschau nutzen koennen.
  *
  * @package    block_questionfilter
@@ -65,8 +65,8 @@ function block_questionfilter_setup_preview_role(): void {
         $role = $DB->get_record('role', ['id' => $roleid]);
     }
 
-    // Alle Pool-Nutzer (kursfilter_guest* und questionfilter_guest*) zuweisen.
-    $prefixes = ['kursfilter_guest', 'questionfilter_guest'];
+    // Alle Pool-Nutzer (kursfilter_pool* und questionfilter_guest*) zuweisen.
+    $prefixes = ['kursfilter_pool', 'questionfilter_guest'];
     foreach ($prefixes as $prefix) {
         $users = $DB->get_records_select(
             'user',

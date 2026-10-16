@@ -49,7 +49,7 @@ function block_questionfilter_after_config(): void {
     }
 
     // Standalone guard: mirror block_kursfilter logic using the shared username prefix.
-    $prefix = 'kursfilter_guest';
+    $prefix = 'kursfilter_pool';
     if (empty($USER->username) || strpos($USER->username, $prefix) !== 0) {
         return;
     }

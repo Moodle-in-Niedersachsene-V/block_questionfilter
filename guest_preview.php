@@ -17,7 +17,7 @@
 /**
  * Gast-Vorschau-Endpunkt fuer block_questionfilter.
  *
- * Waehlt einen Pool-Nutzer (kursfilter_guest*) aus, loggt ihn ein
+ * Waehlt einen Pool-Nutzer (kursfilter_pool*) aus, loggt ihn ein
  * und zeigt eine Zwischenseite mit Links zur Vorschau und zur Startseite.
  * Kein require_login() – Endpunkt ist bewusst oeffentlich.
  *
@@ -52,9 +52,9 @@ if (isloggedin() && !isguestuser()) {
 }
 
 
-// Pool-Nutzer suchen: kursfilter_guest* oder questionfilter_guest*.
+// Pool-Nutzer suchen: kursfilter_pool* oder questionfilter_guest*.
 $pooluser = null;
-$prefixes = ['kursfilter_guest', 'questionfilter_guest'];
+$prefixes = ['kursfilter_pool', 'questionfilter_guest'];
 foreach ($prefixes as $prefix) {
     for ($i = 1; $i <= 50; $i++) {
         $username = $prefix . str_pad((string)$i, 2, '0', STR_PAD_LEFT);

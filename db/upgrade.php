@@ -108,5 +108,12 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
         upgrade_block_savepoint(true, 2026101101, 'questionfilter');
     }
 
+    // Build 2026101601: Vorschaurolle den umbenannten Kursfilter-Pool-Konten (kursfilter_pool*) zuweisen.
+    if ($oldversion < 2026101601) {
+        require_once(__DIR__ . '/install.php');
+        block_questionfilter_setup_preview_role();
+        upgrade_block_savepoint(true, 2026101601, 'questionfilter');
+    }
+
     return true;
 }
