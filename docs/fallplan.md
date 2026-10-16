@@ -7,7 +7,7 @@
 | Projekt / Komponenten | Materialien-Hub: `block_fragenfilter` mit `block_kursfilter` |
 | Planversion / Prüfdatum | 1 / 16.10.2026; ergänzt um Semgrep und Vorschau-CSRF zu #7, KI-Prüfseite und Connector zu #12 sowie Pool-Vorschau über den Kursfilter zu #8; initialer Plan zu [#6](https://github.com/Moodle-in-Niedersachsene-V/block_questionfilter/issues/6), Teil [Spec #2](https://github.com/Moodle-in-Niedersachsene-V/block_questionfilter/issues/2) |
 | Geprüfter Commit | E1–E4/R1–R3: `a4943ea3765c2d49854d116fc368675362f5556e`; S1/S2/S3: #7-Stand `d18828648441fb16bddc9fbe3c8ff1518123c2e8`, genaue geprüfte Dateihashes in `/tmp/questionfilter-spec2-issue7/source-hashes.json`. S3 belegt die CI an genau diesem Commit; nachfolgende reine Nachweisdokumentation ändert diesen Verhaltensnachweis nicht; K1–K4 (#12): `d87abfb`; P1–P5 (#8) gelten für den Commit, der diese Änderung enthält (Basis `d87abfb`, SHA im Git-Log und Übergabebeleg). Kein Release-/Paketnachweis. |
-| Build im Quellstand | `2026101603`, Release `v1.3.11` laut `version.php` (Abhängigkeit `block_kursfilter` ≥ 2026101501); noch kein festgelegter Release-Build für Spec #2 |
+| Build im Quellstand | `2026101604`, Release `v1.3.12` laut `version.php` (Abhängigkeit `block_kursfilter` ≥ 2026101501); noch kein festgelegter Release-Build für Spec #2 |
 | Zugeordnetes Paket | **Nicht vorhanden / nicht geprüft.** Erst #13 erstellt `block_fragenfilter_<build>.zip` aus dem geprüften Release-Commit und belegt die Paketinstallation. |
 | Unterstützte Versionen / Auswahl | `requires = 2025100600` (Moodle 5.1); vereinbarte Matrix 5.1/PHP 8.3/MariaDB 10.11 und 5.2/PHP 8.4/PostgreSQL 16. Nur Materialien-Hub, keine vollständige DB-Kreuzmatrix ([ADR 0001](adr/0001-fragenfilter-runs-only-in-the-materials-hub.md)). |
 | Tatsächlich getestet (historische CI E1) | Moodle **5.1.8 (Build 20261005), PHP 8.3.35**, MariaDB-10.11-Service; Moodle **5.2.4+ (Build 20261013), PHP 8.4.26**, PostgreSQL-16-Service. DB-Patchstände hier nicht festgestellt. Kursfilter jeweils von `main` mitinstalliert. |
@@ -111,6 +111,7 @@ Die CI am finalen #12-Commit ist ein zusätzlicher, hier noch **nicht** enthalte
 ### Ergänzende Nachweise zu #8
 
 Lokale Läufe, Rot-/Grün-Logs, Gate-/Vollscan, Checks und Reviewprotokolle: `/tmp/questionfilter-spec2-issue8/`.
+Die lokalen Läufe stammen vom Merge-Stand mit `origin/main` (Umbenennung der Komponente in `block_fragenfilter`, #17), nicht vom Stand `5aab080` vor der Umbenennung; die Rolle heißt seitdem `fragenfilter_preview`, ein Migrationspfad vom alten Komponentennamen besteht nicht (B1-02 bleibt offen).
 Die CI am finalen #8-Commit ist ein zusätzlicher, hier noch **nicht** enthaltener Pflichtnachweis (Moodle 5.1/MariaDB und 5.2/PostgreSQL). Kursfilter lokal und in CI von `main` (Merge `811973e`, Version 2026101501; der Kursfilter erhöhte die Versionsnummer mit der neuen `preview_starter::start(null, …)`-Schnittstelle nicht, die Abhängigkeitsangabe kann sie daher nicht von älteren Ständen unterscheiden).
 
 - **P1 – Delegation und Pool-Belegung per HTTP:**
