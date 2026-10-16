@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Upgrade-Schritte des Plugins block_questionfilter.
+ * Upgrade steps for block_questionfilter.
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -24,16 +24,16 @@
  */
 
 /**
- * Fuehrt die Upgrade-Schritte des Plugins aus.
+ * Runs the plugin's upgrade steps.
  *
- * @param int $oldversion Bisher installierte Version.
- * @return bool Immer true.
+ * @param int $oldversion Previously installed version.
+ * @return bool Always true.
  */
 function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
     global $DB;
     $dbman = $DB->get_manager();
 
-    // Werte alter Konfigurationsschluessel auf den aktuellen Schluessel uebertragen.
+    // Transfer values from old configuration keys to the current keys.
     $migrations = [
         'nivelevel_levels' => 'difficulty_levels',
         'nivelevel_values' => 'difficulty_levels',
@@ -50,7 +50,7 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
         }
     }
 
-    // Build 2026080501: Bewertungstabelle anlegen.
+    // Build 2026080501: create the ratings table.
     if ($oldversion < 2026080501) {
         $table = new xmldb_table('block_questionfilter_ratings');
         if (!$dbman->table_exists($table)) {
@@ -71,7 +71,7 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
         upgrade_block_savepoint(true, 2026080501, 'questionfilter');
     }
 
-    // Build 2026090514: Systemrolle fuer Fragenvorschau-Gaeste anlegen.
+    // Build 2026090514: create the system role for question preview guests.
     if ($oldversion < 2026090514) {
         global $CFG;
         require_once(__DIR__ . '/install.php');
@@ -79,7 +79,7 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
         upgrade_block_savepoint(true, 2026090514, 'questionfilter');
     }
 
-    // Build 2026090524: Export-Capability zur Vorschau-Rolle hinzufuegen.
+    // Build 2026090524: add the export capability to the preview role.
     if ($oldversion < 2026090524) {
         $roleshortname = 'questionfilter_preview';
         $sysctx = context_system::instance();
@@ -90,7 +90,7 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
         upgrade_block_savepoint(true, 2026090524, 'questionfilter');
     }
 
-    // Build 2026101101: KI-Tag-Vorschlagstabelle anlegen.
+    // Build 2026101101: create the AI tag suggestions table.
     if ($oldversion < 2026101101) {
         $table = new xmldb_table('block_questionfilter_tag_pending');
         if (!$dbman->table_exists($table)) {

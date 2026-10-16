@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Administrationseinstellungen des Plugins block_questionfilter.
+ * Administration settings for block_questionfilter.
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 if ($ADMIN->fulltree) {
-    // Suchbereich.
+    // Search scope.
     $settings->add(new admin_setting_heading(
         'block_questionfilter/searchscope_heading',
         get_string('settings_searchscope_heading', 'block_questionfilter'),
@@ -45,7 +45,7 @@ if ($ADMIN->fulltree) {
         ]
     ));
 
-    // Fragetypen-Anzeige.
+    // Question type display.
     $settings->add(new admin_setting_heading(
         'block_questionfilter/questiontypes_heading',
         get_string('settings_questiontypes_heading', 'block_questionfilter'),
@@ -63,7 +63,7 @@ if ($ADMIN->fulltree) {
         ]
     ));
 
-    // Niveaustufen (erweiterbar).
+    // Difficulty levels (extendable).
     $settings->add(new admin_setting_heading(
         'block_questionfilter/difficulty_heading',
         get_string('settings_difficulty_heading', 'block_questionfilter'),
@@ -77,7 +77,7 @@ if ($ADMIN->fulltree) {
         "Leicht\nMittel\nSchwer"
     ));
 
-    // Benutzerdefinierte Filterfelder.
+    // Custom filter fields.
     $settings->add(new admin_setting_heading(
         'block_questionfilter/customfields_heading',
         get_string('settings_customfields_heading', 'block_questionfilter'),
@@ -91,7 +91,7 @@ if ($ADMIN->fulltree) {
         ''
     ));
 
-    // Export-Formate.
+    // Export formats.
     $settings->add(new admin_setting_heading(
         'block_questionfilter/export_heading',
         get_string('settings_export_heading', 'block_questionfilter'),
@@ -110,7 +110,7 @@ if ($ADMIN->fulltree) {
         ]
     ));
 
-    // Ergebnislimit.
+    // Result limit.
     $settings->add(new admin_setting_configtext(
         'block_questionfilter/resultlimit',
         get_string('settings_resultlimit', 'block_questionfilter'),
@@ -119,7 +119,7 @@ if ($ADMIN->fulltree) {
         PARAM_INT
     ));
 
-    // KI-Verschlagwortung — Hauptschalter und Review-Link.
+    // AI tagging: main switch and review link.
     $settings->add(new admin_setting_heading(
         'block_questionfilter/ai_heading',
         get_string('settings_ai_heading', 'block_questionfilter'),
@@ -159,7 +159,7 @@ if ($ADMIN->fulltree) {
         PARAM_INT
     ));
 
-    // KI-Backend-Auswahl.
+    // AI backend selection.
     $settings->add(new admin_setting_heading(
         'block_questionfilter/ai_backend_heading',
         get_string('settings_ai_backend_heading', 'block_questionfilter'),
@@ -177,7 +177,7 @@ if ($ADMIN->fulltree) {
         ]
     ));
 
-    // Ollama-Einstellungen.
+    // Ollama settings.
     $settings->add(new admin_setting_heading(
         'block_questionfilter/ai_ollama_heading',
         get_string('settings_ai_ollama_heading', 'block_questionfilter'),
@@ -198,7 +198,7 @@ if ($ADMIN->fulltree) {
         'gemma3:4b'
     ));
 
-    // Claude API-Einstellungen.
+    // Claude API settings.
     $settings->add(new admin_setting_heading(
         'block_questionfilter/ai_claude_heading',
         get_string('settings_ai_claude_heading', 'block_questionfilter'),
@@ -220,7 +220,7 @@ if ($ADMIN->fulltree) {
         'claude-haiku-4-5-20251001'
     ));
 
-    // Tagging-Optionen.
+    // Tagging options.
     $settings->add(new admin_setting_heading(
         'block_questionfilter/ai_tagging_heading',
         get_string('settings_ai_tagging_heading', 'block_questionfilter'),

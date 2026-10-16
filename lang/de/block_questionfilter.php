@@ -65,6 +65,7 @@ $string['noquestionsselected'] = 'Keine Fragen ausgewählt.';
 $string['nosessionhash'] = 'Kein Session-Hash fuer Gast-Bewertung uebermittelt.';
 $string['pluginname'] = 'Fragebank-Filter';
 $string['preview_back_btn'] = 'Zurück zur Startseite';
+$string['preview_expectedanswer'] = 'Erwartete Antwort';
 $string['preview_nopooluser'] = 'Vorschau nicht verfügbar: Kein Gast-Account im Pool gefunden. Bitte wenden Sie sich an den Administrator.';
 $string['preview_open_btn'] = 'Vorschau öffnen:';
 $string['preview_ready_desc'] = 'Sie sind jetzt angemeldet. Öffnen Sie die Vorschau und kehren Sie danach zur Startseite zurück um Fragen zu exportieren.';

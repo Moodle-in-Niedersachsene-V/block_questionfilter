@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Webservice-Funktionen des Plugins block_questionfilter.
+ * Web service functions for block_questionfilter.
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -28,33 +28,33 @@ defined('MOODLE_INTERNAL') || die();
 require_once($CFG->libdir . '/externallib.php');
 
 /**
- * Webservice-Funktionen des Fragebank-Filters.
+ * Web service functions for the question bank filter.
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class block_questionfilter_external extends external_api {
-    /** Maximale Anfragen pro Nutzer im Rate-Limit-Zeitfenster. */
+    /** Maximum requests per user within the rate limit window. */
     const RATE_LIMIT_REQUESTS = 30;
 
-    /** Länge des Rate-Limit-Zeitfensters in Sekunden. */
+    /** Rate limit window length in seconds. */
     const RATE_LIMIT_WINDOW = 60;
 
-    /** Absolutes Maximum für zurückgegebene Ergebnisse (DoS-Schutz). */
+    /** Absolute maximum number of returned results (DoS protection). */
     const MAX_RESULT_LIMIT = 200;
 
-    /** Standard-Ergebnislimit wenn der Aufrufer keinen Wert übergibt. */
+    /** Default result limit when the caller does not provide one. */
     const DEFAULT_RESULT_LIMIT = 200;
 
     /**
-     * Prüft das gleitende Rate-Limit für den angegebenen Nutzer.
+     * Checks the sliding rate limit for the given user.
      *
-     * Wirft eine moodle_exception, wenn der Nutzer mehr als RATE_LIMIT_REQUESTS
-     * Anfragen innerhalb von RATE_LIMIT_WINDOW Sekunden gestellt hat.
+     * Throws a moodle_exception if the user has made more than RATE_LIMIT_REQUESTS
+     * requests within RATE_LIMIT_WINDOW seconds.
      *
-     * @param int $userid Moodle-Nutzer-ID.
-     * @throws \moodle_exception Bei überschrittenem Rate-Limit.
+     * @param int $userid Moodle user ID.
+     * @throws \moodle_exception If the rate limit is exceeded.
      */
     private static function check_rate_limit(int $userid): void {
         $cache = \cache::make('block_questionfilter', 'ratelimit');
@@ -79,35 +79,35 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Beschreibt die Parameter der Suchfunktion.
+     * Describes the search parameters.
      *
-     * @return external_function_parameters Parameterdefinition.
+     * @return external_function_parameters Parameter definition.
      */
     public static function search_questions_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'search' => new external_value(PARAM_TEXT, 'Suchbegriff', VALUE_DEFAULT, ''),
-            'categories' => new external_value(PARAM_TEXT, 'Kommagetrennte Kategorie-IDs (leer = alle)', VALUE_DEFAULT, ''),
-            'types' => new external_value(PARAM_TEXT, 'Kommagetrennte Fragetypen', VALUE_DEFAULT, ''),
-            'difficulty' => new external_value(PARAM_TEXT, 'Schwierigkeitsstufe (Tag)', VALUE_DEFAULT, ''),
-            'tags' => new external_value(PARAM_TEXT, 'Kommagetrennte Tags', VALUE_DEFAULT, ''),
+            'search' => new external_value(PARAM_TEXT, 'Search term', VALUE_DEFAULT, ''),
+            'categories' => new external_value(PARAM_TEXT, 'Comma-separated category IDs (empty = all)', VALUE_DEFAULT, ''),
+            'types' => new external_value(PARAM_TEXT, 'Comma-separated question types', VALUE_DEFAULT, ''),
+            'difficulty' => new external_value(PARAM_TEXT, 'Difficulty level (tag)', VALUE_DEFAULT, ''),
+            'tags' => new external_value(PARAM_TEXT, 'Comma-separated tags', VALUE_DEFAULT, ''),
             'scope' => new external_value(PARAM_ALPHA, 'all|course|system', VALUE_DEFAULT, 'all'),
-            'contextid' => new external_value(PARAM_INT, 'Aktueller Kontext', VALUE_DEFAULT, 1),
-            'limit' => new external_value(PARAM_INT, 'Max. Ergebnisse', VALUE_DEFAULT, 200),
+            'contextid' => new external_value(PARAM_INT, 'Current context', VALUE_DEFAULT, 1),
+            'limit' => new external_value(PARAM_INT, 'Maximum results', VALUE_DEFAULT, 200),
         ]);
     }
 
     /**
-     * Sucht Fragen anhand der uebergebenen Filterkriterien.
+     * Searches questions using the given filters.
      *
-     * @param string $search Freitext-Suchbegriff.
-     * @param string $categories Kommagetrennte Kategorie-IDs, leer bedeutet alle.
-     * @param string $types Kommagetrennte Fragetypen.
-     * @param string $difficulty Schwierigkeitsstufe als Tag.
-     * @param string $tags Kommagetrennte Tags.
-     * @param string $scope Suchbereich: all, course oder system.
-     * @param int $contextid ID des aktuellen Kontexts.
-     * @param int $limit Maximale Anzahl an Ergebnissen.
-     * @return array Liste der gefundenen Fragen.
+     * @param string $search Free-text search term.
+     * @param string $categories Comma-separated category IDs; empty means all.
+     * @param string $types Comma-separated question types.
+     * @param string $difficulty Difficulty level as a tag.
+     * @param string $tags Comma-separated tags.
+     * @param string $scope Search scope: all, course or system.
+     * @param int $contextid Current context ID.
+     * @param int $limit Maximum number of results.
+     * @return array Matching questions.
      */
     public static function search_questions(
         string $search,
@@ -132,13 +132,13 @@ class block_questionfilter_external extends external_api {
             'limit' => $limit,
         ]);
 
-        // Limit auf konfigurierten Maximalwert deckeln (DoS-Schutz).
+        // Cap the limit at the configured maximum (DoS protection).
         $maxlimit = (int)(get_config('block_questionfilter', 'resultlimit') ?: 200);
         if ($params['limit'] < 1 || $params['limit'] > $maxlimit) {
             $params['limit'] = $maxlimit;
         }
 
-        // Berechtigungsprüfung — eigene Capability, Gäste können erlaubt werden.
+        // Check the dedicated capability, which can be granted to guests.
         $context = $params['contextid'] > 0
             ? context::instance_by_id($params['contextid'], IGNORE_MISSING) ?? context_system::instance()
             : context_system::instance();
@@ -148,11 +148,11 @@ class block_questionfilter_external extends external_api {
             throw new moodle_exception('nopermission', 'block_questionfilter');
         }
 
-        // Rate-Limit: max. RATE_LIMIT_REQUESTS Anfragen pro Nutzer in RATE_LIMIT_WINDOW Sekunden.
+        // Rate limit: at most RATE_LIMIT_REQUESTS per user within RATE_LIMIT_WINDOW seconds.
         global $USER;
         self::check_rate_limit((int)$USER->id);
 
-        // Kontexte sammeln je nach Suchbereich.
+        // Collect contexts according to the search scope.
         $contextids = self::get_searchable_contextids($params['scope'], $params['contextid']);
 
         if (empty($contextids)) {
@@ -161,7 +161,7 @@ class block_questionfilter_external extends external_api {
 
         [$ctxsql, $ctxargs] = $DB->get_in_or_equal($contextids, SQL_PARAMS_NAMED, 'ctx');
 
-        // Basis-Query über question + question_categories.
+        // Base query joining question and question_categories.
         $sql = "SELECT DISTINCT q.id, q.name, q.qtype, q.createdby,
                        qc.id AS categoryid, qc.name AS categoryname,
                        qc.contextid AS categorycontextid
@@ -175,7 +175,7 @@ class block_questionfilter_external extends external_api {
 
         $queryargs = $ctxargs;
 
-        // Freitext-Suche: Fragentitel ODER Tags.
+        // Free-text search: question title OR tags.
         if (!empty($params['search'])) {
             $searchparam = '%' . $DB->sql_like_escape($params['search']) . '%';
             $sql .= " AND (
@@ -194,7 +194,7 @@ class block_questionfilter_external extends external_api {
             $queryargs['searchtag']  = $searchparam;
         }
 
-        // Fragetyp-Filter.
+        // Question type filter.
         if (!empty($params['types'])) {
             $typelist = array_filter(array_map('trim', explode(',', $params['types'])));
             if ($typelist) {
@@ -204,7 +204,7 @@ class block_questionfilter_external extends external_api {
             }
         }
 
-        // Kategorie-Filter.
+        // Category filter.
         if (!empty($params['categories'])) {
             $catids = array_filter(array_map('intval', explode(',', $params['categories'])));
             if ($catids) {
@@ -218,7 +218,7 @@ class block_questionfilter_external extends external_api {
 
         $rows = $DB->get_records_sql($sql, $queryargs, 0, $params['limit'] + 1);
 
-        // Tag-Filter (inkl. Schwierigkeit) — in PHP, da Moodle Tags flexibel sind.
+        // Filter tags (including difficulty) in PHP because Moodle tags are flexible.
         $alltags = array_filter(array_map('trim', explode(',', $params['tags'])));
         if (!empty($params['difficulty'])) {
             $alltags[] = trim($params['difficulty']);
@@ -228,7 +228,7 @@ class block_questionfilter_external extends external_api {
         foreach ($rows as $row) {
             $qtags = self::get_question_tags((int)$row->id);
 
-            // Tag-Filter anwenden.
+            // Apply the tag filter.
             if (!empty($alltags)) {
                 $tagnames = array_map('strtolower', array_column($qtags, 'name'));
                 $match = true;
@@ -250,7 +250,7 @@ class block_questionfilter_external extends external_api {
                 }
             }
 
-            // Auch in Tags suchen (Freitextsuche).
+            // Also search tags for the free-text term.
             if (!empty($params['search'])) {
                 $tagnames = array_map('strtolower', array_column($qtags, 'name'));
                 $intitle = stripos($row->name, $params['search']) !== false;
@@ -288,9 +288,9 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Beschreibt die Rueckgabewerte der Suchfunktion.
+     * Describes the search return values.
      *
-     * @return external_single_structure Rueckgabedefinition.
+     * @return external_single_structure Return definition.
      */
     public static function search_questions_returns(): external_single_structure {
         return new external_single_structure([
@@ -315,23 +315,23 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Beschreibt die Parameter zum Laden der Kategorien.
+     * Describes the parameters for loading categories.
      *
-     * @return external_function_parameters Parameterdefinition.
+     * @return external_function_parameters Parameter definition.
      */
     public static function get_categories_parameters(): external_function_parameters {
         return new external_function_parameters([
             'scope' => new external_value(PARAM_ALPHA, 'all|course|system', VALUE_DEFAULT, 'all'),
-            'contextid' => new external_value(PARAM_INT, 'Aktueller Kontext', VALUE_DEFAULT, 1),
+            'contextid' => new external_value(PARAM_INT, 'Current context', VALUE_DEFAULT, 1),
         ]);
     }
 
     /**
-     * Laedt alle durchsuchbaren Fragekategorien.
+     * Loads all searchable question categories.
      *
-     * @param string $scope Suchbereich: all, course oder system.
-     * @param int $contextid ID des aktuellen Kontexts.
-     * @return array Liste der Kategorien.
+     * @param string $scope Search scope: all, course or system.
+     * @param int $contextid Current context ID.
+     * @return array Categories.
      */
     public static function get_categories(string $scope, int $contextid): array {
         global $DB;
@@ -381,9 +381,9 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Beschreibt die Rueckgabewerte zum Laden der Kategorien.
+     * Describes the return values for loading categories.
      *
-     * @return external_single_structure Rueckgabedefinition.
+     * @return external_single_structure Return definition.
      */
     public static function get_categories_returns(): external_single_structure {
         return new external_single_structure([
@@ -399,25 +399,25 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Beschreibt die Parameter zum Laden der Fragetypen.
+     * Describes the parameters for loading question types.
      *
-     * @return external_function_parameters Parameterdefinition.
+     * @return external_function_parameters Parameter definition.
      */
     public static function get_questiontypes_parameters(): external_function_parameters {
         return new external_function_parameters([
             'scope' => new external_value(PARAM_ALPHA, 'all|course|system', VALUE_DEFAULT, 'all'),
-            'contextid' => new external_value(PARAM_INT, 'Aktueller Kontext', VALUE_DEFAULT, 1),
+            'contextid' => new external_value(PARAM_INT, 'Current context', VALUE_DEFAULT, 1),
             'source' => new external_value(PARAM_ALPHA, 'existing|installed', VALUE_DEFAULT, 'installed'),
         ]);
     }
 
     /**
-     * Laedt die verfuegbaren Fragetypen.
+     * Loads the available question types.
      *
-     * @param string $scope Suchbereich: all, course oder system.
-     * @param int $contextid ID des aktuellen Kontexts.
-     * @param string $source Quelle: installed oder existing.
-     * @return array Liste der Fragetypen.
+     * @param string $scope Search scope: all, course or system.
+     * @param int $contextid Current context ID.
+     * @param string $source Source: installed or existing.
+     * @return array Question types.
      */
     public static function get_questiontypes(string $scope, int $contextid, string $source = 'installed'): array {
         global $DB, $CFG;
@@ -438,10 +438,10 @@ class block_questionfilter_external extends external_api {
         $qtypes = [];
 
         if ($params['source'] === 'installed') {
-            // Alle installierten qtype-Plugins laden.
+            // Load all installed qtype plugins.
             $plugintypes = core_component::get_plugin_list('qtype');
             foreach ($plugintypes as $key => $path) {
-                // Systemtypen überspringen.
+                // Skip system types.
                 if (in_array($key, ['missingtype', 'unknowntype'])) {
                     continue;
                 }
@@ -454,7 +454,7 @@ class block_questionfilter_external extends external_api {
                 $qtypes[$key] = $label;
             }
         } else {
-            // Nur Typen die tatsächlich in der Fragebank vorhanden sind.
+            // Only types actually present in the question bank.
             $contextids = self::get_searchable_contextids($params['scope'], $params['contextid']);
             if (empty($contextids)) {
                 return ['qtypes' => []];
@@ -481,7 +481,7 @@ class block_questionfilter_external extends external_api {
             }
         }
 
-        // Alphabetisch nach Anzeigename sortieren.
+        // Sort alphabetically by display name.
         asort($qtypes);
 
         $result = [];
@@ -492,9 +492,9 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Beschreibt die Rueckgabewerte zum Laden der Fragetypen.
+     * Describes the return values for loading question types.
      *
-     * @return external_single_structure Rueckgabedefinition.
+     * @return external_single_structure Return definition.
      */
     public static function get_questiontypes_returns(): external_single_structure {
         return new external_single_structure([
@@ -507,25 +507,25 @@ class block_questionfilter_external extends external_api {
         ]);
     }
     /**
-     * Beschreibt die Parameter der Exportfunktion.
+     * Describes the export parameters.
      *
-     * @return external_function_parameters Parameterdefinition.
+     * @return external_function_parameters Parameter definition.
      */
     public static function export_questions_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'questionids' => new external_value(PARAM_TEXT, 'Kommagetrennte Fragen-IDs'),
+            'questionids' => new external_value(PARAM_TEXT, 'Comma-separated question IDs'),
             'format' => new external_value(PARAM_ALPHA, 'xml|csv|gift', VALUE_DEFAULT, 'xml'),
-            'contextid' => new external_value(PARAM_INT, 'Kontext', VALUE_DEFAULT, 1),
+            'contextid' => new external_value(PARAM_INT, 'Context', VALUE_DEFAULT, 1),
         ]);
     }
 
     /**
-     * Exportiert die ausgewaehlten Fragen in das gewuenschte Format.
+     * Exports the selected questions in the requested format.
      *
-     * @param string $questionids Kommagetrennte Fragen-IDs.
-     * @param string $format Zielformat: xml, csv oder gift.
-     * @param int $contextid ID des aktuellen Kontexts.
-     * @return array Angaben zur erzeugten Exportdatei.
+     * @param string $questionids Comma-separated question IDs.
+     * @param string $format Target format: xml, csv or gift.
+     * @param int $contextid Current context ID.
+     * @return array Export file information.
      */
     public static function export_questions(string $questionids, string $format, int $contextid): array {
         global $CFG, $DB;
@@ -536,12 +536,12 @@ class block_questionfilter_external extends external_api {
             'contextid' => $contextid,
         ]);
 
-        // System-Kontext direkt verwenden — Export ist immer systemweit.
-        // context::instance_by_id() wuerde bei contextid=0 eine Exception werfen.
+        // Use the system context directly because exports are always site-wide.
+        // context::instance_by_id() would throw an exception for contextid=0.
         $context = context_system::instance();
         self::validate_context($context);
 
-        // Export erfordert eigene Capability (nicht für Gäste).
+        // Export requires a dedicated capability, unavailable to guests.
         if (!has_capability('block/questionfilter:export', context_system::instance())) {
             throw new moodle_exception('nopermission', 'block_questionfilter');
         }
@@ -571,7 +571,7 @@ class block_questionfilter_external extends external_api {
                 break;
         }
 
-        // Datei im temporären Moodle-Bereich speichern, URL zurückgeben.
+        // Store the file in Moodle's temporary area and return its URL.
         $fs = get_file_storage();
         $sysctx = context_system::instance();
         $fs->delete_area_files($sysctx->id, 'block_questionfilter', 'export', $params['contextid']);
@@ -604,9 +604,9 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Beschreibt die Rueckgabewerte der Exportfunktion.
+     * Describes the export return values.
      *
-     * @return external_single_structure Rueckgabedefinition.
+     * @return external_single_structure Return definition.
      */
     public static function export_questions_returns(): external_single_structure {
         return new external_single_structure([
@@ -619,28 +619,28 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Alle durchsuchbaren Kontext-IDs je nach Suchbereich ermitteln.
+     * Resolves all searchable context IDs for the given scope.
      *
-     * Moodle 4.x:  Fragen liegen in Kurs- und System-Kontexten.
-     * Moodle 5.0+: Fragebanken sind eigenständige mod_qbank-Aktivitäten.
-     *              Jede Fragebank hat einen eigenen CONTEXT_MODULE-Kontext.
-     *              Zusätzlich gibt es pro Kurs eine automatisch migrierte
-     *              „shared question bank" ebenfalls als mod_qbank-Instanz.
+     * Moodle 4.x:  Questions belong to course and system contexts.
+     * Moodle 5.0+: Question banks are standalone mod_qbank activities.
+     *                           Each question bank has its own CONTEXT_MODULE context.
+     *                           Each course also has an automatically migrated
+     *                           "shared question bank" as another mod_qbank instance.
      *
      * Scopes:
-     * - 'system' : nur System-Kontext
-     * - 'course' : aktueller Kurs-Kontext (+ mod_qbank-Kontexte im Kurs bei Moodle 5)
-     * - 'all'    : System + alle Kurse + alle mod_qbank-Kontexte (Moodle 5)
+     * - 'system' : system context only
+     * - 'course' : current course context (+ its mod_qbank contexts in Moodle 5)
+     * - 'all'    : system + all courses + all mod_qbank contexts (Moodle 5)
      *
-     * @param string $scope Suchbereich: all, course oder system.
-     * @param int $contextid ID des aktuellen Kontexts.
-     * @return array Liste der Kontext-IDs.
+     * @param string $scope Search scope: all, course or system.
+     * @param int $contextid Current context ID.
+     * @return array Context IDs.
      */
     private static function get_searchable_contextids(string $scope, int $contextid): array {
         global $DB, $CFG;
 
         $sysctx = context_system::instance();
-        $ismoodle5 = (int)$CFG->version >= 2024100700; // Entspricht Moodle 5.0.
+        $ismoodle5 = (int)$CFG->version >= 2024100700; // Corresponds to Moodle 5.0.
 
         if ($scope === 'system') {
             return [$sysctx->id];
@@ -653,7 +653,7 @@ class block_questionfilter_external extends external_api {
             $coursectx = $ctx->get_course_context(false);
             $ids = $coursectx ? [$coursectx->id, $sysctx->id] : [$sysctx->id];
 
-            // Moodle 5+: mod_qbank-Kontexte des Kurses ergänzen.
+            // Moodle 5+: include the course's mod_qbank contexts.
             if ($ismoodle5 && $coursectx) {
                 $qbankctxids = self::get_qbank_module_contextids($coursectx->instanceid);
                 $ids = array_unique(array_merge($ids, $qbankctxids));
@@ -661,14 +661,14 @@ class block_questionfilter_external extends external_api {
             return $ids;
         }
 
-        // Suchbereich all umfasst System- und alle Kurs-Kontexte.
+        // The all scope includes the system context and all course contexts.
         $coursectxids = $DB->get_fieldset_sql(
             "SELECT id FROM {context} WHERE contextlevel = :lvl",
             ['lvl' => CONTEXT_COURSE]
         );
         $ids = array_merge([$sysctx->id], $coursectxids);
 
-        // Moodle 5+: alle mod_qbank-Modul-Kontexte systemweit ergänzen.
+        // Moodle 5+: include all mod_qbank module contexts site-wide.
         if ($ismoodle5) {
             $qbankctxids = self::get_qbank_module_contextids(null);
             $ids = array_unique(array_merge($ids, $qbankctxids));
@@ -678,20 +678,20 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Liefert alle CONTEXT_MODULE-Kontexte von mod_qbank-Instanzen.
-     * $courseid = null  → systemweit
-     * $courseid = int   → nur dieser Kurs
+     * Returns all CONTEXT_MODULE contexts belonging to mod_qbank instances.
+     * $courseid = null  → site-wide
+     * $courseid = int   → this course only
      *
-     * Moodle 5.0+ speichert Fragebanken als mod_qbank-Aktivitäten.
-     * Die Fragekategorien hängen am Modul-Kontext (contextlevel = 70).
+     * Moodle 5.0+ stores question banks as mod_qbank activities.
+     * Question categories belong to the module context (contextlevel = 70).
      *
-     * @param int|null $courseid Kurs-ID oder null fuer alle Kurse.
-     * @return array Liste der Kontext-IDs.
+     * @param int|null $courseid Course ID or null for all courses.
+     * @return array Context IDs.
      */
     private static function get_qbank_module_contextids(?int $courseid): array {
         global $DB;
 
-        // Mod_qbank existiert nur in Moodle 5+; prüfen ob Modul vorhanden ist.
+        // Mod_qbank only exists in Moodle 5+; check whether the module is available.
         if (!$DB->get_record('modules', ['name' => 'qbank'], 'id', IGNORE_MISSING)) {
             return [];
         }
@@ -713,10 +713,10 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Tags einer Frage laden.
+     * Loads a question's tags.
      *
-     * @param int $questionid ID der Frage.
-     * @return array Liste der Tags.
+     * @param int $questionid Question ID.
+     * @return array Tags.
      */
     private static function get_question_tags(int $questionid): array {
         global $DB;
@@ -736,13 +736,13 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Lesbares Label für den Kontext einer Kategorie.
-     * Für mod_qbank-Instanzen (Moodle 5) wird der tatsächliche
-     * Name der Fragebank aus der qbank-Instanztabelle gelesen.
+     * Returns a readable label for a category's context.
+     * For mod_qbank instances (Moodle 5), the actual question bank
+     * name is read from the qbank instance table.
      *
-     * @param int $contextlevel Kontextebene.
-     * @param int $instanceid ID der Kontextinstanz.
-     * @return string Lesbare Bezeichnung.
+     * @param int $contextlevel Context level.
+     * @param int $instanceid Context instance ID.
+     * @return string Readable label.
      */
     private static function context_label(int $contextlevel, int $instanceid): string {
         global $DB;
@@ -759,7 +759,7 @@ class block_questionfilter_external extends external_api {
                 return $name ?: 'Kurs #' . $instanceid;
 
             case CONTEXT_MODULE:
-                // Kursmodul laden.
+                // Load the course module.
                 $cm = $DB->get_record('course_modules', ['id' => $instanceid], 'id,course,module,instance');
                 if (!$cm) {
                     return 'Modul #' . $instanceid;
@@ -767,11 +767,11 @@ class block_questionfilter_external extends external_api {
 
                 $coursename = $DB->get_field('course', 'shortname', ['id' => $cm->course]) ?: 'Kurs';
 
-                // Modultyp ermitteln.
+                // Determine the module type.
                 $modname = $DB->get_field('modules', 'name', ['id' => $cm->module]);
 
                 if ($modname === 'qbank') {
-                    // Name der Fragebank-Instanz aus mod_qbank holen.
+                    // Read the question bank instance name from mod_qbank.
                     $bankname = $DB->get_field('qbank', 'name', ['id' => $cm->instance]);
                     if ($bankname) {
                         return $coursename . ' › ' . $bankname;
@@ -783,7 +783,7 @@ class block_questionfilter_external extends external_api {
                     }
                 }
 
-                // Fallback: Kursname reicht.
+                // Fallback: the course name is sufficient.
                 return $coursename;
 
             default:
@@ -792,15 +792,15 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Moodle XML-Export über die native qformat_xml-Engine.
+     * Exports Moodle XML through the native qformat_xml engine.
      *
-     * qformat_xml::exportprocess() erwartet Fragen im alten stdClass-Format
-     * (wie aus der DB), nicht question_definition-Objekte von load_question().
-     * get_question_options() lädt Antworten, Hints und Unterfragen (multianswer)
-     * direkt in die stdClass — das ist der korrekte Weg für den Export.
+     * qformat_xml::exportprocess() expects questions in the old stdClass format
+     * (as read from the DB), not question_definition objects from load_question().
+     * get_question_options() loads answers, hints and subquestions (multianswer)
+     * directly into the stdClass, as required for export.
      *
-     * @param array $ids Liste der Fragen-IDs.
-     * @return string Inhalt der Exportdatei.
+     * @param array $ids Question IDs.
+     * @return string Export file contents.
      */
     private static function export_moodle_xml(array $ids): string {
         global $CFG, $DB;
@@ -809,7 +809,7 @@ class block_questionfilter_external extends external_api {
         require_once($CFG->dirroot . '/question/format.php');
         require_once($CFG->dirroot . '/question/format/xml/format.php');
 
-        // Fragen als rohe DB-Datensätze laden (stdClass, nicht question_definition).
+        // Load questions as raw DB records (stdClass, not question_definition).
         [$insql, $args] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'qid');
         $rows = $DB->get_records_sql(
             "SELECT q.*, qc.id AS category
@@ -826,17 +826,17 @@ class block_questionfilter_external extends external_api {
             return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<quiz>\n</quiz>\n";
         }
 
-        // Get_question_options() befüllt jede Frage mit Antworten, Hints,
-        // und bei qtype_multianswer mit Unterfragen (subquestions als stdClass).
-        // qtype muss explizit als String gesetzt werden, da qformat_xml intern
-        // (string)$q->qtype aufruft und bei Objekten eine PHP-Exception wirft.
+        // Get_question_options() populates each question with answers, hints,
+        // and, for qtype_multianswer, subquestions as stdClass objects.
+        // qtype must explicitly be a string because qformat_xml internally
+        // calls (string)$q->qtype, which throws a PHP exception for objects.
         $sysctx = context_system::instance();
         $questions = [];
         foreach ($rows as $q) {
-            $q->qtype = (string)$q->qtype; // Sicherstellen: qtype ist String.
+            $q->qtype = (string)$q->qtype; // Ensure qtype is a string.
             $q->category = (int)$q->category;
-            get_question_options($q); // Ergaenzt $q um Antworten und Hinweise.
-            // Bei multianswer: Unterfragen ebenfalls absichern.
+            get_question_options($q); // Populate $q with answers and hints.
+            // Also normalise multianswer subquestions.
             if ($q->qtype === 'multianswer' && !empty($q->options->questions)) {
                 foreach ($q->options->questions as $sub) {
                     if (is_object($sub)) {
@@ -847,11 +847,11 @@ class block_questionfilter_external extends external_api {
             $questions[] = $q;
         }
 
-        // Writequestion() pro Frage aufrufen statt exportprocess().
-        // exportprocess() liest Kategorie-Kontexte aus der DB und ruft intern
-        // context::instance_by_id() auf – das wirft bei ungültigen Kontext-IDs
-        // eine Exception. Durch den Aufruf von writequestion() pro Frage
-        // umgehen wir diesen Code-Pfad vollständig.
+        // Call writequestion() for each question instead of exportprocess().
+        // exportprocess() reads category contexts from the DB and internally calls
+        // context::instance_by_id(), which throws an exception for invalid context IDs.
+        // Calling writequestion() per question avoids that code path
+        // entirely.
         $qformat = new qformat_xml();
         $qformat->setContexts([$sysctx]);
         $qformat->setCattofile(false);
@@ -865,7 +865,7 @@ class block_questionfilter_external extends external_api {
                     $xmlparts[] = $part;
                 }
             } catch (Exception $e) {
-                // Nicht unterstützte Fragetypen überspringen.
+                // Skip unsupported question types.
                 debugging(
                     'XML export skipped question ' . $q->id . ': ' . $e->getMessage(),
                     DEBUG_DEVELOPER
@@ -881,11 +881,11 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * CSV-Export: ID, Name, Typ, Kategorie, Tags.
-     * RFC 4180-konformes Quoting (doppelte Anführungszeichen escapen).
+     * Exports CSV: ID, name, type, category, tags.
+     * RFC 4180-compliant quoting (escape double quotes).
      *
-     * @param array $ids Liste der Fragen-IDs.
-     * @return string Inhalt der Exportdatei.
+     * @param array $ids Question IDs.
+     * @return string Export file contents.
      */
     private static function export_csv(array $ids): string {
         global $DB;
@@ -921,12 +921,12 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * GIFT-Export ueber Moodles native qformat_gift-Engine.
-     * Verwendet rohe DB-Datensaetze (stdClass) wie der XML-Export,
-     * da qformat_gift::writequestion() stdClass erwartet, nicht question_definition.
+     * Exports GIFT through Moodle's native qformat_gift engine.
+     * Uses raw DB records (stdClass), like the XML export,
+     * because qformat_gift::writequestion() expects stdClass, not question_definition.
      *
-     * @param array $ids Liste der Fragen-IDs.
-     * @return string Inhalt der Exportdatei.
+     * @param array $ids Question IDs.
+     * @return string Export file contents.
      */
     private static function export_gift(array $ids): string {
         global $CFG, $DB;
@@ -938,7 +938,7 @@ class block_questionfilter_external extends external_api {
             require_once($CFG->dirroot . '/question/format.php');
             require_once($giftformatfile);
 
-            // Rohe DB-Datensaetze laden (stdClass) — genau wie beim XML-Export.
+            // Load raw DB records (stdClass), just like the XML export.
             [$insql, $args] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'qid');
             $rows = $DB->get_records_sql(
                 "SELECT q.*, qc.id AS category
@@ -962,7 +962,7 @@ class block_questionfilter_external extends external_api {
                     $q->qtype = (string)$q->qtype;
                     try {
                         get_question_options($q);
-                        // Bei multianswer Unterfragen absichern.
+                        // Normalise multianswer subquestions.
                         if ($q->qtype === 'multianswer' && !empty($q->options->questions)) {
                             foreach ($q->options->questions as $sub) {
                                 if (is_object($sub)) {
@@ -975,7 +975,7 @@ class block_questionfilter_external extends external_api {
                             $output .= $line . "\n";
                         }
                     } catch (Exception $e) {
-                        // Nicht unterstuetzte Fragetypen (z. B. ordering) ueberspringen.
+                        // Skip unsupported question types (e.g. ordering).
                         debugging(
                             'GIFT export skipped question ' . $q->id . ': ' . $e->getMessage(),
                             DEBUG_DEVELOPER
@@ -986,7 +986,7 @@ class block_questionfilter_external extends external_api {
             }
         }
 
-        // Fallback: einfaches Textformat (wenn qformat_gift nicht verfuegbar).
+        // Fallback: plain text when qformat_gift is unavailable.
         [$insql, $args] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'q');
         $questions = $DB->get_records_sql(
             "SELECT q.id, q.name, q.qtype, q.questiontext, qc.name AS categoryname
@@ -1008,24 +1008,24 @@ class block_questionfilter_external extends external_api {
     }
 
     // ---------------------------------------------------------------
-    // Check_capabilities: Aktuelle Nutzer-Capabilities pruefen.
+    // Check_capabilities: check the current user's capabilities.
 
     /**
-     * Parameter fuer check_capabilities.
+     * Parameters for check_capabilities.
      */
     public static function check_capabilities_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'contextid' => new external_value(PARAM_INT, 'Kontext', VALUE_DEFAULT, 1),
+            'contextid' => new external_value(PARAM_INT, 'Context', VALUE_DEFAULT, 1),
         ]);
     }
 
     /**
-     * Gibt die aktuellen Capabilities des eingeloggten Nutzers zurueck.
-     * Wird nach Pool-Login per AJAX aufgerufen damit JS die Export-Buttons
-     * korrekt ein- oder ausblendet.
+     * Returns the logged-in user's current capabilities.
+     * Called via AJAX after pool login so JS can show or hide
+     * the export buttons accordingly.
      *
-     * @param int $contextid Kontext-ID.
-     * @return array Capabilities als bool-Map.
+     * @param int $contextid Context ID.
+     * @return array Capabilities as a boolean map.
      */
     public static function check_capabilities(int $contextid): array {
         $params  = self::validate_parameters(
@@ -1033,8 +1033,8 @@ class block_questionfilter_external extends external_api {
             ['contextid' => $contextid]
         );
 
-        // System-Kontext verwenden — context::instance_by_id() wuerde bei
-        // contextid=0 oder ungueltigem Wert eine Exception werfen.
+        // Use the system context because context::instance_by_id() would throw
+        // an exception for contextid=0 or an invalid value.
         $sysctx = context_system::instance();
         self::validate_context($sysctx);
 
@@ -1057,45 +1057,45 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Rueckgabestruktur fuer check_capabilities.
+     * Return structure for check_capabilities.
      */
     public static function check_capabilities_returns(): external_single_structure {
         return new external_single_structure([
             'canexport'     => new external_value(PARAM_BOOL),
             'canpreview'    => new external_value(PARAM_BOOL),
             'isloggedin'    => new external_value(PARAM_BOOL),
-            'exportformats' => new external_value(PARAM_TEXT, 'Kommagetrennte Export-Formate', VALUE_DEFAULT, 'xml,csv,gift'),
+            'exportformats' => new external_value(PARAM_TEXT, 'Comma-separated export formats', VALUE_DEFAULT, 'xml,csv,gift'),
         ]);
     }
 
     // ---------------------------------------------------------------
-    // Rate_question: Sternebewertung speichern (angemeldete + Gaeste).
+    // Rate_question: save a star rating (logged-in users and guests).
 
     /**
-     * Parameter fuer rate_question.
+     * Parameters for rate_question.
      */
     public static function rate_question_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'questionid'  => new external_value(PARAM_INT, 'Fragen-ID'),
-            'rating'      => new external_value(PARAM_INT, 'Bewertung 1-5'),
-            'sessionhash' => new external_value(PARAM_ALPHANUMEXT, 'Session-Hash fuer Gaeste', VALUE_DEFAULT, ''),
-            'contextid'   => new external_value(PARAM_INT, 'Kontext', VALUE_DEFAULT, 1),
+            'questionid'  => new external_value(PARAM_INT, 'Question ID'),
+            'rating'      => new external_value(PARAM_INT, 'Rating 1-5'),
+            'sessionhash' => new external_value(PARAM_ALPHANUMEXT, 'Session hash for guests', VALUE_DEFAULT, ''),
+            'contextid'   => new external_value(PARAM_INT, 'Context', VALUE_DEFAULT, 1),
         ]);
     }
 
     /**
-     * Sternebewertung einer Frage speichern.
+     * Saves a question's star rating.
      *
-     * Angemeldete Nutzer werden per userid identifiziert,
-     * Gaeste ueber einen clientseitigen Session-Hash.
-     * Jeder Nutzer/Gast kann pro Frage eine Bewertung abgeben
-     * und sie nachtraeglich aendern.
+     * Logged-in users are identified by userid;
+     * guests use a client-side session hash.
+     * Each user or guest can submit one rating per question
+     * and update it later.
      *
-     * @param int    $questionid  Fragen-ID.
-     * @param int    $rating      Bewertung 1-5.
-     * @param string $sessionhash Session-Hash fuer Gaeste.
-     * @param int    $contextid   Aktueller Kontext.
-     * @return array Aktueller Durchschnitt, Anzahl und eigene Bewertung.
+     * @param int    $questionid  Question ID.
+     * @param int    $rating      Rating from 1 to 5.
+     * @param string $sessionhash Session hash for guests.
+     * @param int    $contextid   Current context.
+     * @return array Current average, count and own rating.
      */
     public static function rate_question(
         int $questionid,
@@ -1183,37 +1183,37 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Rueckgabestruktur fuer rate_question.
+     * Return structure for rate_question.
      */
     public static function rate_question_returns(): external_single_structure {
         return new external_single_structure([
-            'average'  => new external_value(PARAM_FLOAT, 'Durchschnitt'),
-            'count'    => new external_value(PARAM_INT, 'Anzahl Bewertungen'),
-            'myrating' => new external_value(PARAM_INT, 'Eigene Bewertung (0 = keine)'),
+            'average'  => new external_value(PARAM_FLOAT, 'Average'),
+            'count'    => new external_value(PARAM_INT, 'Number of ratings'),
+            'myrating' => new external_value(PARAM_INT, 'Own rating (0 = none)'),
         ]);
     }
 
     // ---------------------------------------------------------------
-    // Get_ratings: Durchschnitte fuer eine Liste von Fragen laden.
+    // Get_ratings: load averages for a list of questions.
 
     /**
-     * Parameter fuer get_ratings.
+     * Parameters for get_ratings.
      */
     public static function get_ratings_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'questionids' => new external_value(PARAM_TEXT, 'Kommagetrennte Fragen-IDs'),
-            'sessionhash' => new external_value(PARAM_ALPHANUMEXT, 'Session-Hash fuer Gaeste', VALUE_DEFAULT, ''),
-            'contextid'   => new external_value(PARAM_INT, 'Kontext', VALUE_DEFAULT, 1),
+            'questionids' => new external_value(PARAM_TEXT, 'Comma-separated question IDs'),
+            'sessionhash' => new external_value(PARAM_ALPHANUMEXT, 'Session hash for guests', VALUE_DEFAULT, ''),
+            'contextid'   => new external_value(PARAM_INT, 'Context', VALUE_DEFAULT, 1),
         ]);
     }
 
     /**
-     * Bewertungsdaten fuer mehrere Fragen laden.
+     * Loads rating data for multiple questions.
      *
-     * @param string $questionids Kommagetrennte Fragen-IDs.
-     * @param string $sessionhash Session-Hash fuer Gaeste.
-     * @param int    $contextid   Aktueller Kontext.
-     * @return array Liste mit Durchschnitt, Anzahl und eigener Bewertung je Frage.
+     * @param string $questionids Comma-separated question IDs.
+     * @param string $sessionhash Session hash for guests.
+     * @param int    $contextid   Current context.
+     * @return array Average, count and own rating for each question.
      */
     public static function get_ratings(
         string $questionids,
@@ -1248,7 +1248,7 @@ class block_questionfilter_external extends external_api {
 
         [$insql, $args] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'qid');
 
-        // Durchschnitt und Anzahl je Frage.
+        // Average and count per question.
         $avgs = $DB->get_records_sql(
             "SELECT questionid,
                     AVG(rating) AS average,
@@ -1259,7 +1259,7 @@ class block_questionfilter_external extends external_api {
             $args
         );
 
-        // Eigene Bewertung des aktuellen Nutzers oder Gastes.
+        // The current user's or guest's own rating.
         $myratings = [];
         if ($userid) {
             $rows = $DB->get_records_sql(
@@ -1299,7 +1299,7 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Rueckgabestruktur fuer get_ratings.
+     * Return structure for get_ratings.
      */
     public static function get_ratings_returns(): external_single_structure {
         return new external_single_structure([
@@ -1315,12 +1315,12 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Hilfsmethode: Durchschnitt und eigene Bewertung fuer eine Frage berechnen.
+     * Calculates the average and own rating for one question.
      *
-     * @param int      $qid    Fragen-ID.
-     * @param int|null $userid Nutzer-ID oder null bei Gaesten.
-     * @param string   $hash   Session-Hash fuer Gaeste.
-     * @return array Durchschnitt, Anzahl, eigene Bewertung.
+     * @param int      $qid    Question ID.
+     * @param int|null $userid User ID or null for guests.
+     * @param string   $hash   Session hash for guests.
+     * @return array Average, count and own rating.
      */
     private static function compute_rating(int $qid, ?int $userid, string $hash): array {
         global $DB;
@@ -1354,28 +1354,28 @@ class block_questionfilter_external extends external_api {
     }
 
     // ---------------------------------------------------------------
-    // Get_question_preview: Fragetext und Antwortoptionen laden.
+    // Get_question_preview: load question text and answer options.
 
     /**
-     * Parameter fuer get_question_preview.
+     * Parameters for get_question_preview.
      */
     public static function get_question_preview_parameters(): external_function_parameters {
         return new external_function_parameters([
-            'questionid' => new external_value(PARAM_INT, 'Fragen-ID'),
-            'contextid'  => new external_value(PARAM_INT, 'Kontext', VALUE_DEFAULT, 1),
+            'questionid' => new external_value(PARAM_INT, 'Question ID'),
+            'contextid'  => new external_value(PARAM_INT, 'Context', VALUE_DEFAULT, 1),
         ]);
     }
 
     /**
-     * Laedt Fragetext und Antwortoptionen fuer die Vorschau.
+     * Loads question text and answer options for the preview.
      *
-     * Gibt den Fragetext als bereinigtes HTML zurueck sowie
-     * Antwortoptionen bei Multiple-Choice-Fragen. Steht allen
-     * Nutzern mit block/questionfilter:view offen, auch Gaesten.
+     * Returns the question text as sanitised HTML and
+     * answer options for multiple-choice questions. Available to all
+     * users with block/questionfilter:view, including guests.
      *
-     * @param int $questionid Fragen-ID.
-     * @param int $contextid  Aktueller Kontext.
-     * @return array Fragetext, Typ und Antwortoptionen.
+     * @param int $questionid Question ID.
+     * @param int $contextid  Current context.
+     * @return array Question text, type and answer options.
      */
     public static function get_question_preview(int $questionid, int $contextid): array {
         global $CFG, $DB;
@@ -1396,10 +1396,10 @@ class block_questionfilter_external extends external_api {
 
         $qid = (int)$params['questionid'];
 
-        // Basisdaten der Frage laden.
+        // Load the question's base data.
         $q = $DB->get_record('question', ['id' => $qid, 'parent' => 0], '*', MUST_EXIST);
 
-        // Fragetext bereinigen (HTML erlaubt, aber nur sichere Tags).
+        // Sanitise question text (HTML allowed, but only safe tags).
         require_once($CFG->libdir . '/weblib.php');
         $sysctx     = context_system::instance();
         $questiontext = format_text($q->questiontext, $q->questiontextformat, [
@@ -1408,7 +1408,7 @@ class block_questionfilter_external extends external_api {
             'filter'  => false,
         ]);
 
-        // Allgemeine Feedback-Felder abschneiden (kein Spoiler).
+        // Remove general feedback fields to avoid spoilers.
         $result = [
             'questionid'   => $qid,
             'qtype'        => $q->qtype,
@@ -1418,7 +1418,7 @@ class block_questionfilter_external extends external_api {
             'hinttext'     => '',
         ];
 
-        // Antwortoptionen je Fragetyp laden.
+        // Load answer options according to the question type.
         switch ($q->qtype) {
             case 'multichoice':
                 $answers = $DB->get_records(
@@ -1454,7 +1454,7 @@ class block_questionfilter_external extends external_api {
                 break;
 
             case 'shortanswer':
-                // Nur erste Musterloesung anzeigen (kein vollstaendiger Spoiler).
+                // Show only the first model answer to avoid a full spoiler.
                 $answer = $DB->get_record_sql(
                     "SELECT answer FROM {question_answers}
                       WHERE question = :qid
@@ -1500,7 +1500,7 @@ class block_questionfilter_external extends external_api {
                 break;
 
             default:
-                // Fuer alle anderen Typen nur den Fragetext anzeigen.
+                // Show only the question text for all other types.
                 break;
         }
 
@@ -1508,7 +1508,7 @@ class block_questionfilter_external extends external_api {
     }
 
     /**
-     * Rueckgabestruktur fuer get_question_preview.
+     * Return structure for get_question_preview.
      */
     public static function get_question_preview_returns(): external_single_structure {
         return new external_single_structure([

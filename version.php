@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Versionsangaben des Plugins block_questionfilter.
+ * Version information for block_questionfilter.
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.

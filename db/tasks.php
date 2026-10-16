@@ -26,8 +26,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $tasks = [
-    // KI-Verschlagwortung fuer Fragen ohne Tag-Vorschlag, taeglich 03:00 Uhr.
-    // Standardmaessig deaktiviert – muss in den Einstellungen aktiviert werden.
+    // AI tagging for questions without a tag suggestion, daily at 03:00.
+    // Disabled by default; must be enabled in the settings.
     [
         'classname' => '\block_questionfilter\task\generate_tags',
         'blocking'  => 0,

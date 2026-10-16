@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Renderer des Plugins block_questionfilter.
+ * Renderer for block_questionfilter.
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -24,7 +24,7 @@
  */
 
 /**
- * Renderer des Fragebank-Filters.
+ * Question bank filter renderer.
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -32,19 +32,19 @@
  */
 class block_questionfilter_renderer extends plugin_renderer_base {
     /**
-     * Rendert den Blockinhalt aus dem Mustache-Template.
+     * Renders the block content from the Mustache template.
      *
-     * @param int $blockid ID der Blockinstanz.
-     * @param bool $canexport Ob der Nutzer exportieren darf.
-     * @return string Gerendertes HTML.
+     * @param int $blockid Block instance ID.
+     * @param bool $canexport Whether the user can export.
+     * @return string Rendered HTML.
      */
     public function render_block(int $blockid, bool $canexport = false): string {
-        // Konfigurierbare Niveaustufen aus den Administrationseinstellungen.
+        // Configurable difficulty levels from the administration settings.
         $diffraw = get_config('block_questionfilter', 'difficulty_levels') ?? "Leicht\nMittel\nSchwer";
         $difficulties = array_filter(array_map('trim', explode("\n", $diffraw)));
 
-        // Export-Buttons werden immer im DOM gerendert (initial display:none).
-        // JS blendet sie per refreshCapabilities() ein — auch nach Pool-Login.
+        // Export buttons are always rendered in the DOM (initially display:none).
+        // JS shows them through refreshCapabilities(), including after pool login.
         $templatedata = [
             'blockid'      => $blockid,
             'difficulties' => array_values($difficulties),

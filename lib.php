@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Bibliotheksfunktionen des Plugins block_questionfilter.
+ * Library functions for block_questionfilter.
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -28,15 +28,15 @@
  *
  * Delegates pool-user restrictions entirely to block_kursfilter when that
  * plugin is installed (it already handles messaging suppression and URL
- * redirects for pool users). If block_kursfilter is not present, this
- * callback applies the same guards independently so pool users cannot reach
+ * redirects for pool accounts). If block_kursfilter is not present, this
+ * callback applies the same guards independently so pool accounts cannot reach
  * profile, preferences, messaging or similar pages even when only
  * block_questionfilter is installed.
  */
 function block_questionfilter_after_config(): void {
     global $CFG, $USER;
 
-    // Only act on real pool users.
+    // Only act on real pool accounts.
     if (!isloggedin() || isguestuser()) {
         return;
     }
@@ -88,18 +88,18 @@ function block_questionfilter_after_config(): void {
 }
 
 /**
- * Datei-Download-Handler fuer Export-Dateien.
+ * Download handler for export files.
  *
- * Wird von Moodle automatisch aufgerufen bei
+ * Called automatically by Moodle at
  * /pluginfile.php/.../block_questionfilter/export/...
  *
- * @param stdClass $course Kursobjekt.
- * @param stdClass $cm Kursmodulobjekt.
- * @param context $context Kontext der Datei.
- * @param string $filearea Dateibereich.
- * @param array $args Restliche Pfadbestandteile.
- * @param bool $forcedownload Ob der Download erzwungen wird.
- * @param array $options Zusaetzliche Optionen fuer die Auslieferung.
+ * @param stdClass $course Course object.
+ * @param stdClass $cm Course module object.
+ * @param context $context File context.
+ * @param string $filearea File area.
+ * @param array $args Remaining path components.
+ * @param bool $forcedownload Whether to force the download.
+ * @param array $options Additional file serving options.
  * @return void
  */
 function block_questionfilter_pluginfile(

@@ -34,7 +34,7 @@ $PAGE->set_heading(get_string('review_title', 'block_questionfilter'));
 
 $action = optional_param('action', '', PARAM_ALPHA);
 
-// Aktion verarbeiten.
+// Process the action.
 if ($action) {
     require_sesskey();
     if ($action === 'approveall') {
@@ -60,7 +60,7 @@ if ($action) {
         redirect($PAGE->url);
     }
 
-    // Einzelaktion.
+    // Single action.
     $pendingid = optional_param('id', 0, PARAM_INT);
     if ($pendingid) {
         $pending = $DB->get_record(
@@ -84,7 +84,7 @@ if ($action) {
     }
 }
 
-// Statistik.
+// Statistics.
 $totalcount    = $DB->count_records('block_questionfilter_tag_pending', ['status' => 'pending']);
 $appliedcount  = $DB->count_records('block_questionfilter_tag_pending', ['status' => 'applied']);
 $rejectedcount = $DB->count_records('block_questionfilter_tag_pending', ['status' => 'rejected']);
@@ -106,7 +106,7 @@ $pending = $DB->get_records_sql(
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('review_title', 'block_questionfilter'));
 
-// Statistik-Leiste.
+// Statistics bar.
 echo html_writer::div(
     html_writer::tag(
         'span',
@@ -135,7 +135,7 @@ if (empty($pending) && $totalcount === 0) {
     exit;
 }
 
-// Sammelaktionen oben.
+// Bulk actions at the top.
 if ($totalcount > 0) {
     $approveallurl = new moodle_url('/blocks/questionfilter/review.php', [
         'action'  => 'approveall',
@@ -168,7 +168,7 @@ if (empty($pending)) {
     exit;
 }
 
-// Tabelle.
+// Table.
 $table = new \html_table();
 $table->head = [
     get_string('col_question', 'block_questionfilter'),

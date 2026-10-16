@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Datenschutz-Provider des Plugins block_questionfilter.
+ * Privacy provider for block_questionfilter.
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -26,12 +26,12 @@
 namespace block_questionfilter\privacy;
 
 /**
- * Datenschutz-Provider fuer block_questionfilter.
+ * Privacy provider for block_questionfilter.
  *
- * Der Block speichert keine personenbezogenen Daten selbst.
- * Export-Dateien werden temporaer im Moodle-Filestore abgelegt
- * und sind nur fuer den exportierenden Nutzer zugaenglich.
- * Es werden keine Nutzerdaten persistent gespeichert.
+ * The block does not store personal data itself.
+ * Export files are stored temporarily in Moodle's file store
+ * and are accessible only to the exporting user.
+ * No user data is stored persistently.
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -39,9 +39,9 @@ namespace block_questionfilter\privacy;
  */
 class provider implements \core_privacy\local\metadata\null_provider {
     /**
-     * Begruendung, warum keine personenbezogenen Daten gespeichert werden.
+     * Provides the reason why no personal data is stored.
      *
-     * @return string Sprachschluessel der Begruendung.
+     * @return string Language key for the reason.
      */
     public static function get_reason(): string {
         return 'privacy:metadata';

@@ -65,6 +65,7 @@ $string['noquestionsselected'] = 'No questions selected.';
 $string['nosessionhash'] = 'No session hash provided for guest rating.';
 $string['pluginname'] = 'Question bank filter';
 $string['preview_back_btn'] = 'Back to home page';
+$string['preview_expectedanswer'] = 'Expected answer';
 $string['preview_nopooluser'] = 'Preview not available: No guest pool account found. Please contact the administrator.';
 $string['preview_open_btn'] = 'Open preview:';
 $string['preview_ready_desc'] = 'You are now logged in. Open the preview and then return to the home page to export questions.';

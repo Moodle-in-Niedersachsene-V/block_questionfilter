@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Blockklasse des Plugins block_questionfilter.
+ * Block class for block_questionfilter.
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -24,7 +24,7 @@
  */
 
 /**
- * Blockklasse des Fragebank-Filters.
+ * Question bank filter block class.
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -32,7 +32,7 @@
  */
 class block_questionfilter extends block_base {
     /**
-     * Initialisiert den Block und setzt den Titel.
+     * Initialises the block and sets its title.
      *
      * @return void
      */
@@ -41,9 +41,9 @@ class block_questionfilter extends block_base {
     }
 
     /**
-     * Legt fest, auf welchen Seitentypen der Block verwendet werden darf.
+     * Defines the page types on which the block can be used.
      *
-     * @return array Seitentypen mit Erlaubnis-Kennzeichen.
+     * @return array Page types with permission flags.
      */
     public function applicable_formats(): array {
         return [
@@ -54,18 +54,18 @@ class block_questionfilter extends block_base {
     }
 
     /**
-     * Gibt an, dass der Block globale Einstellungen besitzt.
+     * Indicates that the block has global settings.
      *
-     * @return bool Immer true.
+     * @return bool Always true.
      */
     public function has_config(): bool {
         return true;
     }
 
     /**
-     * Gibt an, ob der Block mehrfach auf einer Seite platziert werden darf.
+     * Indicates whether multiple instances are allowed on a page.
      *
-     * @return bool Immer false.
+     * @return bool Always false.
      */
     public function instance_allow_multiple(): bool {
         return false;
@@ -74,9 +74,9 @@ class block_questionfilter extends block_base {
 
 
     /**
-     * Erzeugt den Inhalt des Blocks.
+     * Generates the block content.
      *
-     * @return stdClass Inhaltsobjekt mit gerendertem Text.
+     * @return stdClass Content object with rendered text.
      */
     public function get_content(): stdClass {
         global $CFG;
@@ -87,17 +87,17 @@ class block_questionfilter extends block_base {
 
         $this->content = new stdClass();
 
-        // Eigene View-Capability, kann fuer Gaeste aktiviert werden.
+        // The dedicated view capability can be granted to guests.
         if (!has_capability('block/questionfilter:view', context_system::instance())) {
             $this->content->text = get_string('nopermission', 'block_questionfilter');
             return $this->content;
         }
 
-        // Export-Berechtigung pruefen und an JavaScript uebergeben.
-        // Wird jedes Mal neu berechnet damit Pool-Nutzer nach Login korrekte Buttons sehen.
+        // Check export permission and pass it to JavaScript.
+        // Recalculate each time so pool accounts see the correct buttons after login.
         $canexport = has_capability('block/questionfilter:export', context_system::instance());
 
-        // AMD-Modul laden.
+        // Load the AMD module.
         $this->page->requires->js_call_amd('block_questionfilter/filter', 'init', [
             [
                 'blockid' => (int)$this->instance->id,

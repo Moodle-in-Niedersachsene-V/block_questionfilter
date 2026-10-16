@@ -15,13 +15,13 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Gast-Vorschau-Endpunkt fuer block_questionfilter.
+ * Guest preview endpoint for block_questionfilter.
  *
- * Waehlt einen Pool-Nutzer (kursfilter_guest*) aus, loggt ihn ein
- * und zeigt eine Zwischenseite mit Links zur Vorschau und zur Startseite.
- * Kein require_login() – Endpunkt ist bewusst oeffentlich.
+ * Selects a pool account (kursfilter_guest*), logs them in
+ * and shows an intermediate page with links to the preview and home page.
+ * No require_login(): this endpoint is intentionally public.
  *
- * Aufruf: /blocks/questionfilter/guest_preview.php?qid=42
+ * Usage: /blocks/questionfilter/guest_preview.php?qid=42
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -32,7 +32,7 @@ require_once(__DIR__ . '/../../config.php'); // @codingStandardsIgnoreLine
 
 $qid = required_param('qid', PARAM_INT);
 
-// Frage muss existieren.
+// The question must exist.
 $question = $DB->get_record('question', ['id' => $qid, 'parent' => 0], 'id, name', IGNORE_MISSING);
 if (!$question) {
     $PAGE->set_context(context_system::instance());
@@ -46,13 +46,13 @@ if (!$question) {
     exit;
 }
 
-// Bereits angemeldete Nutzer direkt zur Vorschau weiterleiten.
+// Redirect already logged-in users directly to the preview.
 if (isloggedin() && !isguestuser()) {
     redirect(new moodle_url('/question/bank/previewquestion/preview.php', ['id' => $qid]));
 }
 
 
-// Pool-Nutzer suchen: kursfilter_guest* oder questionfilter_guest*.
+// Find pool accounts: kursfilter_guest* or questionfilter_guest*.
 $pooluser = null;
 $prefixes = ['kursfilter_guest', 'questionfilter_guest'];
 foreach ($prefixes as $prefix) {
@@ -83,13 +83,13 @@ if (!$pooluser) {
     exit;
 }
 
-// Pool-Nutzer einloggen.
+// Log in the pool account.
 $pooluser = get_complete_user_data('id', $pooluser->id);
 complete_user_login($pooluser);
 
-// Nach Login: Zwischenseite ausgeben, die per postMessage dem Opener-Tab
-// bescheid gibt (damit dort refreshCapabilities() laeuft und die Export-Buttons
-// erscheinen) und dann direkt zur Fragenvorschau navigiert.
+// After login, render an intermediate page that notifies the opener tab
+// via postMessage so refreshCapabilities() shows the export buttons,
+// then navigate directly to the question preview.
 $previewurl = (new moodle_url(
     '/question/bank/previewquestion/preview.php',
     ['id' => $qid]
@@ -106,7 +106,7 @@ $previewurljson = json_encode($previewurl);
 echo <<<HTML
 <script>
 (function() {
-    // Opener (Block-Seite) informieren, dass Pool-Login abgeschlossen ist.
+    // Notify the opener (block page) that pool login has completed.
     if (window.opener && !window.opener.closed) {
         try {
             window.opener.postMessage(
@@ -115,7 +115,7 @@ echo <<<HTML
             );
         } catch (e) { /* cross-origin guard */ }
     }
-    // Direkt zur Fragenvorschau navigieren.
+    // Navigate directly to the question preview.
     window.location.replace({$previewurljson});
 })();
 </script>

@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Cache-Definitionen des Plugins block_questionfilter.
+ * Cache definitions for block_questionfilter.
  *
  * @package    block_questionfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -26,10 +26,10 @@
 defined('MOODLE_INTERNAL') || die();
 
 $definitions = [
-    // Schiebefenster-Rate-Limiting für die Such-API (pro Nutzer, kurzlebig).
+    // Sliding-window rate limiting for the search API (per user, short-lived).
     'ratelimit' => [
         'mode'       => cache_store::MODE_APPLICATION,
         'simplekeys' => true,
-        'ttl'        => 120, // 2 Minuten – laenger als das Zeitfenster (60 s).
+        'ttl'        => 120, // 2 minutes, longer than the window (60 s).
     ],
 ];

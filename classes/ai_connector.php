@@ -54,10 +54,10 @@ class ai_connector {
      * Author IDs, category IDs, course IDs, and Moodle-internal metadata
      * are stripped before the request leaves the server.
      *
-     * @param string $questionname  Fragenname (Titel).
-     * @param string $questiontext  Fragetext (HTML wird zu Plain-Text).
-     * @param string $qtype         Interner Fragetyp-Schluessel.
-     * @return string[]             Liste vorgeschlagener Tags (max. ai_max_tags).
+     * @param string $questionname  Question name (title).
+     * @param string $questiontext  Question text (HTML is converted to plain text).
+     * @param string $qtype         Internal question type key.
+     * @return string[]             Suggested tags (at most ai_max_tags).
      */
     public function suggest_tags(
         string $questionname,
@@ -67,7 +67,7 @@ class ai_connector {
         $maxtags    = (int)(get_config('block_questionfilter', 'ai_max_tags') ?: 5);
         $categories = get_config('block_questionfilter', 'ai_tag_categories') ?: '';
 
-        // Fragetext: HTML entfernen, auf 800 Zeichen kuerzen (Datensparsamkeit).
+        // Strip HTML and truncate question text to 800 characters for data minimisation.
         $plaintext = strip_tags($questiontext);
         $plaintext = html_entity_decode($plaintext, ENT_QUOTES, 'UTF-8');
         $plaintext = preg_replace('/\s+/', ' ', trim($plaintext));
@@ -88,12 +88,12 @@ class ai_connector {
      * Builds the prompt sent to the AI.
      * Kept short to reduce token use and processing time.
      *
-     * @param string $name       Fragenname.
-     * @param string $text       Bereinigter Fragetext.
-     * @param string $qtype      Fragetyp.
-     * @param int    $max        Maximale Anzahl Tags.
-     * @param string $categories Zeilengetrennte Themenkategorien.
-     * @return string            Fertiger Prompt.
+     * @param string $name       Question name.
+     * @param string $text       Sanitised question text.
+     * @param string $qtype      Question type.
+     * @param int    $max        Maximum number of tags.
+     * @param string $categories Newline-separated topic categories.
+     * @return string            Completed prompt.
      */
     private function build_prompt(
         string $name,
@@ -214,7 +214,7 @@ class ai_connector {
      * Simple HTTP POST via Moodle's \curl wrapper.
      *
      * Using \curl (not native curl_*) ensures Moodle's proxy settings and
-     * SSRF-protection rules are respected (moodle-curl-statt-moodle-curl).
+     * SSRF protection rules are respected.
      *
      * @param string   $url     Target URL.
      * @param string   $payload JSON payload.
