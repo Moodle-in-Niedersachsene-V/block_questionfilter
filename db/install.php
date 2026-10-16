@@ -18,7 +18,7 @@
  * Post-installation steps for block_questionfilter.
  *
  * Creates the site-wide question preview guest role and
- * assigns it to all kursfilter_guest* pool accounts so they
+ * assigns it to all kursfilter_pool* pool accounts so they
  * can use Moodle's question preview.
  *
  * @package    block_questionfilter
@@ -69,8 +69,8 @@ function block_questionfilter_setup_preview_role(): void {
         $role = $DB->get_record('role', ['id' => $roleid]);
     }
 
-    // Assign all pool accounts (kursfilter_guest* and questionfilter_guest*).
-    $prefixes = ['kursfilter_guest', 'questionfilter_guest'];
+    // Assign all pool accounts (kursfilter_pool* and questionfilter_guest*).
+    $prefixes = ['kursfilter_pool', 'questionfilter_guest'];
     foreach ($prefixes as $prefix) {
         $users = $DB->get_records_select(
             'user',

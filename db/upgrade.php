@@ -108,5 +108,12 @@ function xmldb_block_questionfilter_upgrade(int $oldversion): bool {
         upgrade_block_savepoint(true, 2026101101, 'questionfilter');
     }
 
+    // Build 2026101601: Assign the preview role to renamed Kursfilter pool accounts (kursfilter_pool*).
+    if ($oldversion < 2026101601) {
+        require_once(__DIR__ . '/install.php');
+        block_questionfilter_setup_preview_role();
+        upgrade_block_savepoint(true, 2026101601, 'questionfilter');
+    }
+
     return true;
 }

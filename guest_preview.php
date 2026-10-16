@@ -17,7 +17,7 @@
 /**
  * Guest preview endpoint for block_questionfilter.
  *
- * Selects a pool account (kursfilter_guest*), logs them in
+ * Selects a pool account (kursfilter_pool*), logs them in
  * and shows an intermediate page with links to the preview and home page.
  * No require_login(): this endpoint is intentionally public.
  *
@@ -52,9 +52,9 @@ if (isloggedin() && !isguestuser()) {
 }
 
 
-// Find pool accounts: kursfilter_guest* or questionfilter_guest*.
+// Find pool accounts: kursfilter_pool* or questionfilter_guest*.
 $pooluser = null;
-$prefixes = ['kursfilter_guest', 'questionfilter_guest'];
+$prefixes = ['kursfilter_pool', 'questionfilter_guest'];
 foreach ($prefixes as $prefix) {
     for ($i = 1; $i <= 50; $i++) {
         $username = $prefix . str_pad((string)$i, 2, '0', STR_PAD_LEFT);
