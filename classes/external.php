@@ -119,7 +119,7 @@ class block_questionfilter_external extends external_api {
         int $contextid,
         int $limit
     ): array {
-        global $DB;
+        global $DB, $USER;
 
         $params = self::validate_parameters(self::search_questions_parameters(), [
             'search' => $search,
@@ -142,14 +142,25 @@ class block_questionfilter_external extends external_api {
         $context = $params['contextid'] > 0
             ? context::instance_by_id($params['contextid'], IGNORE_MISSING) ?? context_system::instance()
             : context_system::instance();
-        self::validate_context($context);
+        // Public search validates guest access without retaining a guest login.
+        $anonymous = !isloggedin();
+        $originaluser = clone $USER;
+        if ($anonymous) {
+            \core\session\manager::set_user(guest_user());
+        }
+        try {
+            self::validate_context($context);
+        } finally {
+            if ($anonymous) {
+                \core\session\manager::set_user($originaluser);
+            }
+        }
 
         if (!has_capability('block/questionfilter:view', context_system::instance())) {
             throw new moodle_exception('nopermission', 'block_questionfilter');
         }
 
         // Rate limit: at most RATE_LIMIT_REQUESTS per user within RATE_LIMIT_WINDOW seconds.
-        global $USER;
         self::check_rate_limit((int)$USER->id);
 
         // Collect contexts according to the search scope.
