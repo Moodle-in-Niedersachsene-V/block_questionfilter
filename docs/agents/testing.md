@@ -185,7 +185,19 @@ Tabellenstruktur wird auch bei einem Testfehler wiederhergestellt.
 
 **Vor Deploy zwingend extern:** Altbestand im Live-Hub prüfen und im PR belegen.
 Lokale Fixtures ersetzen diesen Nachweis nicht; #10 bleibt bis dahin offen.
-Privacy-Metadaten einschließlich des neuen Ereignisses `question_rated` folgen in
-#11. Das Ereignis enthält Frage und Sterne, keine Cookie-Kennung; Moodle-Logs
+Die Privacy-Metadaten (#11, unten) deklarieren auch das neue Ereignis `question_rated`. Das Ereignis enthält Frage und Sterne, keine Cookie-Kennung; Moodle-Logs
 können dennoch Konto/IP zuordnen. Belege: `/tmp/questionfilter-spec2-issue10/`,
 dauerhafte ignorierte Sicherung `.issue10-evidence.tar.gz` und `.issue10-resume.md`.
+
+## Privacy-Provider (#11)
+
+`tests/privacy/provider_test.php` nutzt Moodles Provider-Testbasis (`core_privacy\tests\provider_testcase`) in der Datenbank der Testinstallation, ohne Webserver:
+
+- Metadaten: Bewertungstabelle (Spalten ohne Konto), Cookie `kf_rater_id`, `core_files`, `core_cache`, Logstore-Link, Claude- und Ollama-Datenfluss. Jeder Beschreibungsschlüssel existiert in `lang/en` und `lang/de`; beide Dateien haben dieselben `privacy:`-Schlüssel.
+- Kontobezug: zwei Konten exportieren echt über `question_export::create`. Kontextliste und Nutzerliste enthalten nur diese Konten; ein drittes Konto ohne Export bleibt außen vor.
+- Export schreibt nur die Datei des anfragenden Kontos. Löschung je Konto, je Nutzerliste und für den Kontext lässt fremde Dateien (außer bei Kontextlöschung) und andere Kontexte unberührt.
+- Bewertungen bleiben bei jeder Löschung bestehen: Sie haben keinen Kontobezug (ADR 0003, Abschnitt Privacy-Provider).
+
+Nicht getestet: Export/Löschung der Logstore-Zeilen (Logstore-Plugin), Cache-Ablauf und ein realer KI-Aufruf.
+
+Belege: `/tmp/questionfilter-spec2-issue11/`.
