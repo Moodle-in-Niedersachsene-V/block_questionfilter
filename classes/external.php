@@ -47,21 +47,25 @@ class block_fragenfilter_external extends external_api {
     /** Default result limit when the caller does not provide one. */
     const DEFAULT_RESULT_LIMIT = 200;
 
+    /** Maximum number of distinct question IDs per get_ratings call, matching the search limit. */
+    const MAX_RATING_IDS = self::MAX_RESULT_LIMIT;
+
     /** @var string|null Rating cookie shared by all calls in the current AJAX batch. */
     private static ?string $ratingcookie = null;
 
     /**
-     * Checks the sliding rate limit for the given user.
+     * Checks the sliding rate limit for the given user at the caller's network address.
      *
      * Throws a moodle_exception if the user has made more than RATE_LIMIT_REQUESTS
-     * requests within RATE_LIMIT_WINDOW seconds.
+     * requests within RATE_LIMIT_WINDOW seconds. The bucket belongs to the account and the
+     * address together, so anonymous visitors (user 0) and reused pool accounts do not share one.
      *
      * @param int $userid Moodle user ID.
      * @throws \moodle_exception If the rate limit is exceeded.
      */
     private static function check_rate_limit(int $userid): void {
         $cache = \cache::make('block_fragenfilter', 'ratelimit');
-        $key   = 'rl_' . $userid;
+        $key   = 'rl_' . hash('sha256', $userid . '|' . getremoteaddr());
         $now   = time();
         $data  = $cache->get($key);
 
@@ -756,11 +760,12 @@ class block_fragenfilter_external extends external_api {
     /**
      * Loads rating data for multiple questions.
      *
-     * Context and block access are checked by validate_search_context().
+     * Context and block access are checked by validate_search_context(). Only questions the
+     * caller may see carry rating data; all others are answered like unknown questions.
      *
-     * @param string $questionids Comma-separated question IDs.
+     * @param string $questionids Comma-separated question IDs, at most MAX_RATING_IDS distinct ones.
      * @param int    $contextid   Current context.
-     * @return array Average, count and own rating for each question.
+     * @return array Average, count and own rating for each requested question.
      * nosemgrep: moodle-external-ohne-kontextpruefung */
     public static function get_ratings(
         string $questionids,
@@ -775,42 +780,51 @@ class block_fragenfilter_external extends external_api {
 
         self::validate_search_context($params['contextid']);
 
-        $ids = array_filter(array_map('intval', explode(',', $params['questionids'])));
-        if (empty($ids)) {
+        $requested = array_values(array_unique(array_filter(
+            array_map('intval', explode(',', $params['questionids'])),
+            fn(int $id): bool => $id > 0
+        )));
+        if (count($requested) > self::MAX_RATING_IDS) {
+            throw new invalid_parameter_exception('At most ' . self::MAX_RATING_IDS . ' questions may be requested.');
+        }
+        if (empty($requested)) {
             return ['ratings' => []];
         }
-
-        $hash = self::$ratingcookie ?? \block_kursfilter\rating_helper::get_cookie_hash();
-
-        [$insql, $args] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'qid');
-
-        // Average and count per question.
-        $avgs = $DB->get_records_sql(
-            "SELECT questionid,
-                    AVG(stars) AS average,
-                    COUNT(*)    AS cnt
-               FROM {block_fragenfilter_ratings}
-              WHERE questionid $insql
-           GROUP BY questionid",
-            $args
-        );
-
+        // Questions the caller cannot see are answered like unknown ones: no rating data.
+        $visible = \block_fragenfilter\question_visibility::visible_ids($requested);
+        $avgs = [];
         $myratings = [];
-        if ($hash !== null) {
-            $rows = $DB->get_records_sql(
-                "SELECT questionid, stars
+        if ($visible) {
+            [$insql, $args] = $DB->get_in_or_equal($visible, SQL_PARAMS_NAMED, 'qid');
+
+            // Average and count per question.
+            $avgs = $DB->get_records_sql(
+                "SELECT questionid,
+                        AVG(stars) AS average,
+                        COUNT(*)    AS cnt
                    FROM {block_fragenfilter_ratings}
                   WHERE questionid $insql
-                    AND cookiehash = :hash",
-                array_merge($args, ['hash' => $hash])
+               GROUP BY questionid",
+                $args
             );
-            foreach ($rows as $row) {
-                $myratings[(int)$row->questionid] = (int)$row->stars;
+
+            $hash = self::$ratingcookie ?? \block_kursfilter\rating_helper::get_cookie_hash();
+            if ($hash !== null) {
+                $rows = $DB->get_records_sql(
+                    "SELECT questionid, stars
+                       FROM {block_fragenfilter_ratings}
+                      WHERE questionid $insql
+                        AND cookiehash = :hash",
+                    array_merge($args, ['hash' => $hash])
+                );
+                foreach ($rows as $row) {
+                    $myratings[(int)$row->questionid] = (int)$row->stars;
+                }
             }
         }
 
         $result = [];
-        foreach ($ids as $qid) {
+        foreach ($requested as $qid) {
             $result[] = [
                 'questionid' => $qid,
                 'average'    => isset($avgs[$qid]) ? round((float)$avgs[$qid]->average, 1) : 0.0,
@@ -863,65 +877,5 @@ class block_fragenfilter_external extends external_api {
             'count'    => (int)$cnt,
             'myrating' => $mine,
         ];
-    }
-
-    // ---------------------------------------------------------------
-    // Get_question_preview: load question text and answer options.
-
-    /**
-     * Parameters for get_question_preview.
-     */
-    public static function get_question_preview_parameters(): external_function_parameters {
-        return new external_function_parameters([
-            'questionid' => new external_value(PARAM_INT, 'Question ID'),
-            'contextid'  => new external_value(PARAM_INT, 'Context', VALUE_DEFAULT, 1),
-        ]);
-    }
-
-    /**
-     * Loads question text and answer options for the preview.
-     *
-     * Context and block access are checked by validate_search_context().
-     * Returns the question text as sanitised HTML and
-     * answer options for multiple-choice questions. Available to all
-     * users with block/fragenfilter:view, including guests.
-     *
-     * @param int $questionid Question ID.
-     * @param int $contextid  Current context.
-     * @return array Question text, type and answer options.
-     * nosemgrep: moodle-external-ohne-kontextpruefung */
-    public static function get_question_preview(int $questionid, int $contextid): array {
-        global $CFG, $DB;
-
-        $params = self::validate_parameters(self::get_question_preview_parameters(), [
-            'questionid' => $questionid,
-            'contextid'  => $contextid,
-        ]);
-
-        self::validate_search_context($params['contextid']);
-        if (!isloggedin() || isguestuser()) {
-            throw new moodle_exception('nopermission', 'block_fragenfilter');
-        }
-
-        return \block_fragenfilter\question_preview::get($params['questionid']);
-    }
-
-    /**
-     * Return structure for get_question_preview.
-     */
-    public static function get_question_preview_returns(): external_single_structure {
-        return new external_single_structure([
-            'questionid'   => new external_value(PARAM_INT),
-            'qtype'        => new external_value(PARAM_ALPHA),
-            'name'         => new external_value(PARAM_TEXT),
-            'questiontext' => new external_value(PARAM_RAW),
-            'answers'      => new external_multiple_structure(
-                new external_single_structure([
-                    'text'    => new external_value(PARAM_RAW),
-                    'correct' => new external_value(PARAM_BOOL),
-                ])
-            ),
-            'hinttext' => new external_value(PARAM_TEXT),
-        ]);
     }
 }

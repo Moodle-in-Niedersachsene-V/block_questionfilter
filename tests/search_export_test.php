@@ -82,15 +82,6 @@ final class search_export_test extends \advanced_testcase {
         $categories = \external_api::clean_returnvalue(\block_fragenfilter_external::get_categories_returns(), $categories);
         $this->assertCount(2, $categories['categories']);
         $this->assertSame([1, 1], array_column($categories['categories'], 'questioncount'));
-        $preview = \block_fragenfilter_external::get_question_preview($questions[$bankctx->id]->id, $coursectx->id);
-        $preview = \external_api::clean_returnvalue(\block_fragenfilter_external::get_question_preview_returns(), $preview);
-        $this->assertSame((int)$questions[$bankctx->id]->id, $preview['questionid']);
-        try {
-            \block_fragenfilter_external::get_question_preview($foreign->id, $coursectx->id);
-            $this->fail('A foreign question must not expose preview data.');
-        } catch (\moodle_exception $e) {
-            $this->assertSame('invalidquestion', $e->errorcode);
-        }
         assign_capability('moodle/question:viewall', CAP_ALLOW, $role, $bankctx->id);
         accesslib_clear_all_caches_for_unit_testing();
         $result = \block_fragenfilter_external::search_questions('', '', '', '', '', 'course', $coursectx->id, 200);
@@ -134,6 +125,48 @@ final class search_export_test extends \advanced_testcase {
                 $this->assertSame('nopermission', $e->errorcode);
             }
         }
+    }
+
+    public function test_search_rate_limit_is_kept_per_account_and_network_address(): void {
+        global $CFG;
+        require_once($CFG->dirroot . '/blocks/fragenfilter/classes/external.php');
+        $this->resetAfterTest();
+        set_config('forcelogin', 0);
+        $search = fn() => \block_fragenfilter_external::search_questions('', '', '', '', '', 'all', 1, 1);
+        $assertlimited = function () use ($search): void {
+            try {
+                $search();
+                $this->fail('The request over the limit must be rejected.');
+            } catch (\moodle_exception $e) {
+                $this->assertSame('ratelimitexceeded', $e->errorcode);
+            }
+        };
+        $exhaust = function () use ($search, $assertlimited): void {
+            for ($i = 0; $i < \block_fragenfilter_external::RATE_LIMIT_REQUESTS; $i++) {
+                $search();
+            }
+            $assertlimited();
+        };
+
+        // One anonymous visitor over the limit does not lock out another address.
+        $this->setUser(0);
+        $_SERVER['REMOTE_ADDR'] = '192.0.2.10';
+        $exhaust();
+        $_SERVER['REMOTE_ADDR'] = '192.0.2.11';
+        $this->assertArrayHasKey('questions', $search());
+
+        // A reused account is limited per address, too, and independent of the anonymous visitors.
+        $user = $this->getDataGenerator()->create_user();
+        $this->setUser($user);
+        $_SERVER['REMOTE_ADDR'] = '192.0.2.10';
+        $exhaust();
+        $_SERVER['REMOTE_ADDR'] = '192.0.2.12';
+        $this->assertArrayHasKey('questions', $search());
+
+        // The anonymous visitor on the exhausted address stays rejected within the window.
+        $this->setUser(0);
+        $_SERVER['REMOTE_ADDR'] = '192.0.2.10';
+        $assertlimited();
     }
 
     public function test_search_validates_scope_context_ids_and_limits(): void {

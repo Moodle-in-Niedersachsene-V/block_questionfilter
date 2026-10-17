@@ -208,6 +208,13 @@ Belege: `/tmp/questionfilter-spec2-issue11/`.
 - Die Request-Tests laufen mit Entwickler-Debugging (`debug`, `debugdisplay`) und prüfen jede Seitenantwort (`preview_request`) auf Debug-Meldungen und angezeigte PHP-Hinweise. AJAX-Antworten sind ausgenommen: Moodle zeigt dort nie Debugging an (`NO_DEBUG_DISPLAY`). Die Tests laufen mit dem Tabellenpräfix `phpu_` statt `mdl_`.
 - `test_pool_account_is_kept_off_profile_pages_and_a_real_account_is_not` prüft die Profilsperre des Kursfilters in der kombinierten Installation. Die Sperre selbst gehört dem Kursfilter.
 
+## Review-Fixes zum Gesamtreview (Spec #2)
+
+- `get_ratings` filtert die angefragten IDs über `question_visibility::visible_ids()` auf die für den Aufrufer sichtbaren Fragen; nicht sichtbare IDs erhalten dieselbe Nullantwort wie unbekannte. Höchstens `MAX_RATING_IDS` (200) verschiedene IDs, mehr wird abgewiesen (`test_get_ratings_treats_questions_the_visitor_cannot_see_like_unknown_ones`, `test_get_ratings_accepts_at_most_200_distinct_question_ids`). Die Fixtures legen Bewertungen direkt in der Tabelle an, auch unter dem eigenen Cookie des Besuchers.
+- Die Anfragebegrenzung der Suche zählt je Konto und Netzwerkadresse (`getremoteaddr()`); der API-Test setzt `$_SERVER['REMOTE_ADDR']` und prüft anonyme Besucher sowie ein wiederverwendetes Konto (`search_export_test::test_search_rate_limit_is_kept_per_account_and_network_address`).
+- `external::get_question_preview` und `question_preview` waren nicht als Webservice registriert und hatten keinen Aufrufer außer ihrem Test; sie sind entfernt. Die Vorschau läuft über `guest_preview.php` und die Core-Vorschau.
+- Nach der Versionserhöhung die Test-Instanzen gezielt upgraden und `init.php` erneut ausführen (siehe oben).
+
 ## Release (#13)
 
 Reihenfolge nach Vereins-Arbeitsablauf: Entwicklung abschließen, `moodle-plugin-ci phpcbf` (muss „No violations“ melden), erst danach die Build-Nummer `YYYYMMDDNN` in `version.php` setzen, Moodle-Upgrade, alle Checks und Suiten, Semgrep-Gate, CI. Jede Codeänderung danach verlangt eine neue Build-Nummer und einen neuen Durchlauf.

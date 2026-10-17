@@ -71,18 +71,34 @@ final class question_visibility {
      * @return bool True if the question exists in a category the current user may view.
      */
     public static function is_visible(int $questionid): bool {
+        return self::visible_ids([$questionid]) === [$questionid];
+    }
+
+    /**
+     * Filters question IDs to the ready questions the current user may see, as the search would list them.
+     *
+     * Unknown IDs and IDs the user may not see are dropped alike, so the result tells nothing about them.
+     *
+     * @param int[] $questionids Question IDs.
+     * @return int[] The visible IDs in the given order.
+     */
+    public static function visible_ids(array $questionids): array {
         global $DB;
 
+        if (!$questionids) {
+            return [];
+        }
         [$visibilitysql, $args] = self::sql('all', \context_system::instance()->id);
-        $args['questionid'] = $questionid;
-        return $DB->record_exists_sql(
-            "SELECT 1 FROM {question} q
+        [$insql, $idargs] = $DB->get_in_or_equal($questionids, SQL_PARAMS_NAMED, 'questionid');
+        $visible = $DB->get_fieldset_sql(
+            "SELECT q.id FROM {question} q
                JOIN {question_versions} qv ON qv.questionid = q.id
                JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
                JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
-              WHERE q.id = :questionid AND q.parent = 0 AND qv.status = 'ready' AND $visibilitysql",
-            $args
+              WHERE q.id $insql AND q.parent = 0 AND qv.status = 'ready' AND $visibilitysql",
+            $args + $idargs
         );
+        return array_values(array_intersect($questionids, array_map('intval', $visible)));
     }
 
     /**

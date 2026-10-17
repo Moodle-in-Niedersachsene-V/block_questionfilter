@@ -297,6 +297,75 @@ final class request_test extends \advanced_testcase {
         $this->assertSame(1, $DB->count_records('block_fragenfilter_ratings'));
     }
 
+    public function test_get_ratings_treats_questions_the_visitor_cannot_see_like_unknown_ones(): void {
+        global $DB;
+
+        $visible = $this->create_question();
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $hidden = $generator->create_question('truefalse', null, [
+            'category' => $generator->create_question_category()->id,
+        ]);
+        $sesskey = $this->visitor_sesskey();
+        $rate = $this->ajax([[
+            'index' => 0, 'methodname' => 'block_fragenfilter_rate_question',
+            'args' => ['questionid' => $visible->id, 'rating' => 3, 'contextid' => 1],
+        ]], $sesskey)[0];
+        $this->assertFalse($rate['error'], json_encode($rate));
+        $ownhash = $DB->get_field('block_fragenfilter_ratings', 'cookiehash', ['questionid' => $visible->id], MUST_EXIST);
+        // Ratings that already exist for a question the visitor cannot see, including one under the visitor's own cookie.
+        $existing = [
+            [$visible->id, str_repeat('a', 64), 4],
+            [$hidden->id, str_repeat('b', 64), 5],
+            [$hidden->id, $ownhash, 1],
+        ];
+        foreach ($existing as [$questionid, $cookiehash, $stars]) {
+            $DB->insert_record('block_fragenfilter_ratings', (object)[
+                'questionid' => $questionid, 'cookiehash' => $cookiehash, 'stars' => $stars, 'timecreated' => time(),
+            ]);
+        }
+        $this->assertSame(2, $DB->count_records('block_fragenfilter_ratings', ['questionid' => $hidden->id]));
+        $unknown = 2147483647;
+
+        $read = $this->ajax([[
+            'index' => 0, 'methodname' => 'block_fragenfilter_get_ratings',
+            'args' => ['questionids' => implode(',', [$visible->id, $hidden->id, $unknown]), 'contextid' => 1],
+        ]], $sesskey)[0];
+
+        $this->assertFalse($read['error'], json_encode($read));
+        $this->assertSame(
+            [
+                ['questionid' => (int)$visible->id, 'average' => 3.5, 'count' => 2, 'myrating' => 3],
+                ['questionid' => (int)$hidden->id, 'average' => 0, 'count' => 0, 'myrating' => 0],
+                ['questionid' => $unknown, 'average' => 0, 'count' => 0, 'myrating' => 0],
+            ],
+            $read['data']['ratings']
+        );
+    }
+
+    public function test_get_ratings_accepts_at_most_200_distinct_question_ids(): void {
+        $question = $this->create_question();
+        $sesskey = $this->visitor_sesskey();
+        $call = fn(array $ids) => $this->ajax([[
+            'index' => 0, 'methodname' => 'block_fragenfilter_get_ratings',
+            'args' => ['questionids' => implode(',', $ids), 'contextid' => 1],
+        ]], $sesskey)[0];
+
+        $limit = range(1, 200);
+        $limit[0] = (int)$question->id;
+        $accepted = $call($limit);
+        $this->assertFalse($accepted['error'], json_encode($accepted));
+        $this->assertCount(200, $accepted['data']['ratings']);
+        // Repeating an ID does not count twice.
+        $repeated = $call(array_merge($limit, [$limit[0], $limit[0]]));
+        $this->assertFalse($repeated['error'], json_encode($repeated));
+        $this->assertCount(200, $repeated['data']['ratings']);
+
+        $rejected = $call(range(1, 201));
+        $this->assertTrue($rejected['error'], json_encode($rejected));
+        $this->assertArrayNotHasKey('data', $rejected);
+        $this->assertSame('invalidparameter', $rejected['exception']['errorcode']);
+    }
+
     /**
      * Fails if a page response carries a Moodle debugging message or a displayed PHP notice or warning.
      *
