@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Administrationseinstellungen des Plugins block_fragenfilter.
+ * Administration settings for block_fragenfilter.
  *
  * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -26,7 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 if ($ADMIN->fulltree) {
-    // Suchbereich.
+    // Search scope.
     $settings->add(new admin_setting_heading(
         'block_fragenfilter/searchscope_heading',
         get_string('settings_searchscope_heading', 'block_fragenfilter'),
@@ -45,7 +45,7 @@ if ($ADMIN->fulltree) {
         ]
     ));
 
-    // Fragetypen-Anzeige.
+    // Question type display.
     $settings->add(new admin_setting_heading(
         'block_fragenfilter/questiontypes_heading',
         get_string('settings_questiontypes_heading', 'block_fragenfilter'),
@@ -63,7 +63,7 @@ if ($ADMIN->fulltree) {
         ]
     ));
 
-    // Niveaustufen (erweiterbar).
+    // Difficulty levels (extendable).
     $settings->add(new admin_setting_heading(
         'block_fragenfilter/difficulty_heading',
         get_string('settings_difficulty_heading', 'block_fragenfilter'),
@@ -77,7 +77,7 @@ if ($ADMIN->fulltree) {
         "Leicht\nMittel\nSchwer"
     ));
 
-    // Benutzerdefinierte Filterfelder.
+    // Custom filter fields.
     $settings->add(new admin_setting_heading(
         'block_fragenfilter/customfields_heading',
         get_string('settings_customfields_heading', 'block_fragenfilter'),
@@ -91,7 +91,7 @@ if ($ADMIN->fulltree) {
         ''
     ));
 
-    // Export-Formate.
+    // Export formats.
     $settings->add(new admin_setting_heading(
         'block_fragenfilter/export_heading',
         get_string('settings_export_heading', 'block_fragenfilter'),
@@ -110,7 +110,7 @@ if ($ADMIN->fulltree) {
         ]
     ));
 
-    // Ergebnislimit.
+    // Result limit.
     $settings->add(new admin_setting_configtext(
         'block_fragenfilter/resultlimit',
         get_string('settings_resultlimit', 'block_fragenfilter'),
@@ -119,7 +119,7 @@ if ($ADMIN->fulltree) {
         PARAM_INT
     ));
 
-    // KI-Verschlagwortung — Hauptschalter und Review-Link.
+    // AI tagging: main switch and review link.
     $settings->add(new admin_setting_heading(
         'block_fragenfilter/ai_heading',
         get_string('settings_ai_heading', 'block_fragenfilter'),
@@ -159,7 +159,7 @@ if ($ADMIN->fulltree) {
         PARAM_INT
     ));
 
-    // KI-Backend-Auswahl.
+    // AI backend selection.
     $settings->add(new admin_setting_heading(
         'block_fragenfilter/ai_backend_heading',
         get_string('settings_ai_backend_heading', 'block_fragenfilter'),
@@ -177,7 +177,7 @@ if ($ADMIN->fulltree) {
         ]
     ));
 
-    // Ollama-Einstellungen.
+    // Ollama settings.
     $settings->add(new admin_setting_heading(
         'block_fragenfilter/ai_ollama_heading',
         get_string('settings_ai_ollama_heading', 'block_fragenfilter'),
@@ -198,19 +198,18 @@ if ($ADMIN->fulltree) {
         'gemma3:4b'
     ));
 
-    // Claude API-Einstellungen.
+    // Claude API settings.
     $settings->add(new admin_setting_heading(
         'block_fragenfilter/ai_claude_heading',
         get_string('settings_ai_claude_heading', 'block_fragenfilter'),
         get_string('settings_ai_claude_desc', 'block_fragenfilter')
     ));
 
-    $settings->add(new admin_setting_configtext(
+    $settings->add(new admin_setting_configpasswordunmask(
         'block_fragenfilter/ai_claude_apikey',
         get_string('settings_ai_claude_apikey', 'block_fragenfilter'),
         get_string('settings_ai_claude_apikey_help', 'block_fragenfilter'),
-        '',
-        PARAM_RAW
+        ''
     ));
 
     $settings->add(new admin_setting_configtext(
@@ -220,7 +219,7 @@ if ($ADMIN->fulltree) {
         'claude-haiku-4-5-20251001'
     ));
 
-    // Tagging-Optionen.
+    // Tagging options.
     $settings->add(new admin_setting_heading(
         'block_fragenfilter/ai_tagging_heading',
         get_string('settings_ai_tagging_heading', 'block_fragenfilter'),

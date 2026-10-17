@@ -5,7 +5,7 @@
 # Plugin: block_fragenfilter
 # Ablage: .github/workflows/moodle-ci.yml
 #
-# Angepasst: kein tests/ vorhanden, daher ohne phpunit- und behat-Schritt.
+# Angepasst: PHPUnit mit HTTP-Request-Tests, kein Behat-Schritt.
 # templates/ und amd/ sind vorhanden, grunt und mustache bleiben aktiv.
 ##############################################################################
 
@@ -19,6 +19,19 @@ on:
   workflow_dispatch:
 
 jobs:
+  semgrep:
+    runs-on: ubuntu-22.04
+    container:
+      # Semgrep 1.179.0; immutable image used by the documented local scan.
+      image: semgrep/semgrep@sha256:93963d9295a366f59e4850127b1550400ee7b388f04fe144e4a1f6325d96e01b
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep (ERROR blocks)
+        run: >-
+          semgrep scan --config .github/semgrep/moodle-security.yml
+          --severity ERROR --error --strict --metrics=off --disable-version-check
+          --no-rewrite-rule-ids .
+
   test:
     runs-on: ubuntu-22.04
 
@@ -85,10 +98,50 @@ jobs:
           echo "NVM_DIR=$HOME/.nvm" >> $GITHUB_ENV
 
       - name: Moodle und Plugin installieren
-        run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
+        run: |
+          moodle-plugin-ci add-plugin --branch main Moodle-in-Niedersachsene-V/block_kursfilter
+          moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
         env:
           DB: ${{ matrix.database }}
           MOODLE_BRANCH: ${{ matrix.moodle-branch }}
+
+      - name: Webserver für Request-Tests starten
+        run: |
+          cd moodle
+          cat > qf-web-config.php <<'EOF'
+          <?php
+          // The request test server uses PHPUnit tables and files, never the site data.
+          if (getenv('QUESTIONFILTER_WEB_TESTS')) {
+              $CFG->prefix = $CFG->phpunit_prefix;
+              $CFG->dataroot = $CFG->phpunit_dataroot;
+              $CFG->wwwroot = getenv('QUESTIONFILTER_WEB_TESTS');
+              unset($CFG->phpunit_prefix, $CFG->phpunit_dataroot);
+          }
+          EOF
+          sed -i "s#^require_once(.*lib/setup.php.*#require_once(__DIR__ . '/qf-web-config.php');\n&#" config.php
+          QUESTIONFILTER_WEB_TESTS=http://127.0.0.1:8080 nohup php -S 127.0.0.1:8080 -t public > ../webserver.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:8080/login/index.php > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat ../webserver.log
+          exit 1
+
+      - name: PHPUnit (inkl. HTTP-Request-Tests)
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpunit --fail-on-warning
+        env:
+          QUESTIONFILTER_WEB_URL: http://127.0.0.1:8080
+
+      - name: Request-Test-Webserverlog bereitstellen
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: webserver-${{ matrix.php }}
+          path: webserver.log
+          if-no-files-found: ignore
 
       - name: PHP Lint (Syntaxpruefung)
         if: ${{ !cancelled() }}

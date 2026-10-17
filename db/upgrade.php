@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Upgrade-Schritte des Plugins block_fragenfilter.
+ * Upgrade steps for block_fragenfilter.
  *
  * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -24,16 +24,16 @@
  */
 
 /**
- * Fuehrt die Upgrade-Schritte des Plugins aus.
+ * Runs the plugin's upgrade steps.
  *
- * @param int $oldversion Bisher installierte Version.
- * @return bool Immer true.
+ * @param int $oldversion Previously installed version.
+ * @return bool Always true.
  */
 function xmldb_block_fragenfilter_upgrade(int $oldversion): bool {
     global $DB;
     $dbman = $DB->get_manager();
 
-    // Werte alter Konfigurationsschluessel auf den aktuellen Schluessel uebertragen.
+    // Transfer values from old configuration keys to the current keys.
     $migrations = [
         'nivelevel_levels' => 'difficulty_levels',
         'nivelevel_values' => 'difficulty_levels',
@@ -50,7 +50,7 @@ function xmldb_block_fragenfilter_upgrade(int $oldversion): bool {
         }
     }
 
-    // Build 2026080501: Bewertungstabelle anlegen.
+    // Build 2026080501: create the ratings table.
     if ($oldversion < 2026080501) {
         $table = new xmldb_table('block_fragenfilter_ratings');
         if (!$dbman->table_exists($table)) {
@@ -71,15 +71,14 @@ function xmldb_block_fragenfilter_upgrade(int $oldversion): bool {
         upgrade_block_savepoint(true, 2026080501, 'fragenfilter');
     }
 
-    // Build 2026090514: Systemrolle fuer Fragenvorschau-Gaeste anlegen.
+    // Build 2026090514: create the question preview role and give it to the pool accounts.
+    // The later role steps repeat the idempotent assignment, because each savepoint must stand on its own.
     if ($oldversion < 2026090514) {
-        global $CFG;
-        require_once(__DIR__ . '/install.php');
-        block_fragenfilter_setup_preview_role();
+        \block_fragenfilter\preview_role::assign_to_pool_accounts();
         upgrade_block_savepoint(true, 2026090514, 'fragenfilter');
     }
 
-    // Build 2026090524: Export-Capability zur Vorschau-Rolle hinzufuegen.
+    // Build 2026090524: add the export capability to the preview role.
     if ($oldversion < 2026090524) {
         $roleshortname = 'fragenfilter_preview';
         $sysctx = context_system::instance();
@@ -90,7 +89,7 @@ function xmldb_block_fragenfilter_upgrade(int $oldversion): bool {
         upgrade_block_savepoint(true, 2026090524, 'fragenfilter');
     }
 
-    // Build 2026101101: KI-Tag-Vorschlagstabelle anlegen.
+    // Build 2026101101: create the AI tag suggestions table.
     if ($oldversion < 2026101101) {
         $table = new xmldb_table('block_fragenfilter_tag_pending');
         if (!$dbman->table_exists($table)) {
@@ -108,11 +107,51 @@ function xmldb_block_fragenfilter_upgrade(int $oldversion): bool {
         upgrade_block_savepoint(true, 2026101101, 'fragenfilter');
     }
 
-    // Build 2026101601: Vorschaurolle den umbenannten Kursfilter-Pool-Konten (kursfilter_pool*) zuweisen.
+    // Build 2026101601: Assign the preview role to renamed Kursfilter pool accounts (kursfilter_pool*).
     if ($oldversion < 2026101601) {
-        require_once(__DIR__ . '/install.php');
-        block_fragenfilter_setup_preview_role();
+        \block_fragenfilter\preview_role::assign_to_pool_accounts();
         upgrade_block_savepoint(true, 2026101601, 'fragenfilter');
+    }
+
+    // Build 2026101603: The preview role goes to all pool accounts of block_kursfilter, including later created ones.
+    if ($oldversion < 2026101603) {
+        \block_fragenfilter\preview_role::assign_to_pool_accounts();
+        upgrade_block_savepoint(true, 2026101603, 'fragenfilter');
+    }
+
+    // Unlink legacy identities while preserving their stars and creation times (ADR 0003).
+    if ($oldversion < 2026101605) {
+        $table = new xmldb_table('block_fragenfilter_ratings');
+        $field = new xmldb_field('cookiehash', XMLDB_TYPE_CHAR, '64', null, null);
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        foreach (
+            [
+                new xmldb_index('idx_userid_question', XMLDB_INDEX_NOTUNIQUE, ['userid', 'questionid']),
+                new xmldb_index('idx_session_question', XMLDB_INDEX_NOTUNIQUE, ['sessionhash', 'questionid']),
+            ] as $index
+        ) {
+            if ($dbman->index_exists($table, $index)) {
+                $dbman->drop_index($table, $index);
+            }
+        }
+        $dbman->drop_key($table, new xmldb_key('fk_user', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']));
+        foreach (['userid', 'sessionhash', 'timemodified'] as $name) {
+            $field = new xmldb_field($name);
+            if ($dbman->field_exists($table, $field)) {
+                $dbman->drop_field($table, $field);
+            }
+        }
+        $field = new xmldb_field('rating', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL);
+        if ($dbman->field_exists($table, $field)) {
+            $dbman->rename_field($table, $field, 'stars');
+        }
+        $index = new xmldb_index('question_cookie', XMLDB_INDEX_UNIQUE, ['questionid', 'cookiehash']);
+        if (!$dbman->index_exists($table, $index)) {
+            $dbman->add_index($table, $index);
+        }
+        upgrade_block_savepoint(true, 2026101605, 'fragenfilter');
     }
 
     return true;

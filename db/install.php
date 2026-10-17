@@ -15,11 +15,9 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Post-Installationsschritte fuer block_fragenfilter.
+ * Post-installation steps for block_fragenfilter.
  *
- * Legt die systemweite Rolle "Fragenvorschau-Gast" an und
- * weist sie allen kursfilter_pool*-Pool-Nutzern zu, damit
- * diese die Moodle-Fragenvorschau nutzen koennen.
+ * Creates the question preview role and assigns it to the pool accounts of block_kursfilter.
  *
  * @package    block_fragenfilter
  * @copyright  2026 Moodle in Niedersachsen e. V.
@@ -27,63 +25,8 @@
  */
 
 /**
- * Wird nach der Installation des Plugins ausgefuehrt.
+ * Runs after the plugin is installed.
  */
 function xmldb_block_fragenfilter_install(): void {
-    block_fragenfilter_setup_preview_role();
-}
-
-/**
- * Legt die Rolle "Fragenvorschau-Gast" an (falls noetig) und
- * weist sie allen verfuegbaren Pool-Nutzern im System-Kontext zu.
- *
- * Die Rolle erhaelt ausschliesslich moodle/question:usemine,
- * damit Pool-Nutzer die Fragenvorschau aufrufen koennen,
- * ohne weitere Rechte zu erhalten.
- */
-function block_fragenfilter_setup_preview_role(): void {
-    global $DB;
-
-    $roleshortname = 'fragenfilter_preview';
-    $sysctx        = context_system::instance();
-
-    // Rolle anlegen oder vorhandene verwenden.
-    $role = $DB->get_record('role', ['shortname' => $roleshortname]);
-    if (!$role) {
-        $roleid = create_role(
-            get_string('role_preview_name', 'block_fragenfilter'),
-            $roleshortname,
-            get_string('role_preview_desc', 'block_fragenfilter'),
-            ''
-        );
-        // Rolle nur auf Systemebene verwendbar.
-        set_role_contextlevels($roleid, [CONTEXT_SYSTEM]);
-        // Einzige Capability: Fragenvorschau.
-        assign_capability('moodle/question:usemine', CAP_ALLOW, $roleid, $sysctx->id, true);
-        // Export-Capability fuer Pool-Nutzer.
-        assign_capability('block/fragenfilter:export', CAP_ALLOW, $roleid, $sysctx->id, true);
-        $role = $DB->get_record('role', ['id' => $roleid]);
-    }
-
-    // Alle Pool-Nutzer (kursfilter_pool*, fragenfilter_guest* und legacy questionfilter_guest*) zuweisen.
-    $prefixes = ['kursfilter_pool', 'fragenfilter_guest', 'questionfilter_guest'];
-    foreach ($prefixes as $prefix) {
-        $users = $DB->get_records_select(
-            'user',
-            $DB->sql_like('username', ':prefix') . " AND deleted = 0 AND suspended = 0",
-            ['prefix' => $prefix . '%']
-        );
-        foreach ($users as $user) {
-            // Nur zuweisen falls noch nicht vorhanden.
-            if (
-                !$DB->record_exists('role_assignments', [
-                'roleid'    => $role->id,
-                'userid'    => $user->id,
-                'contextid' => $sysctx->id,
-                ])
-            ) {
-                role_assign($role->id, $user->id, $sysctx->id);
-            }
-        }
-    }
+    \block_fragenfilter\preview_role::assign_to_pool_accounts();
 }
