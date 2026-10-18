@@ -4,7 +4,7 @@
 
 - **Umbenennung:** Komponente heißt jetzt `block_fragenfilter` (früher `block_questionfilter`). Zip: `block_fragenfilter_<build>.zip`, Wurzelordner `fragenfilter/`. Moodle sieht das als neues Plugin; das alte muss vorher deinstalliert werden.
 - **Kursfilter:** `block_kursfilter` mindestens Build 2026101501 (Stand `main`, inkl. #22/#23), zusammen mit diesem Release.
-- **Build-Nummern:** live `block_questionfilter` 2026101211, `block_kursfilter` 2026101028. Neu: `block_fragenfilter` 2026101702, `block_kursfilter` 2026101501. Beide höher als live.
+- **Build-Nummern:** live `block_questionfilter` 2026101211, `block_kursfilter` 2026101028. Neu: `block_fragenfilter` 2026101703, `block_kursfilter` 2026101501. Beide höher als live.
 - **Upgrade-Schritte:** laufen nicht automatisch. Beim Hochladen im File-Picker jeden Teilschritt mit „OK“ bestätigen (kein Konsolen-Upgrade nötig).
 - **Datenschutz:** kein AV-Vertrag nötig, siehe `docs/datenschutz.md`.
 
@@ -19,7 +19,7 @@
 1. **Sichern:** Datenbank-Backup. Einstellungen des alten Blocks notieren (Screenshot): Website-Administration → Plugins → Blöcke → Fragenfilter. Wichtig: KI-Backend, Claude-API-Key, Batchgröße, Auto-Apply, Rollen/Fächerlisten.
 2. **Alten Block von der Startseite entfernen** (Seite bearbeiten → Block löschen). Optional, es geht auch beim Deinstallieren.
 3. **Altes Plugin deinstallieren:** Website-Administration → Plugins → Plugin-Übersicht → `block_questionfilter` → Deinstallieren.
-4. **Neue Plugins hochladen:** Plugin installieren (File-Picker) mit `block_fragenfilter_2026101702.zip` und `block_kursfilter` (2026101501). Jeden Teilschritt mit „OK“ bestätigen. Das Upgrade legt die Vorschau-Rolle für die Pool-Konten an.
+4. **Neue Plugins hochladen:** Plugin installieren (File-Picker) mit `block_fragenfilter_2026101703.zip` und `block_kursfilter` (2026101501). Jeden Teilschritt mit „OK“ bestätigen. Das Upgrade legt die Vorschau-Rolle für die Pool-Konten an.
 5. **Einstellungen neu eintragen:** KI-Backend = **Claude**, API-Key neu eintragen (Ollama nicht verwenden; der Code-Default ist noch `ollama`). Eine Quota gibt es nicht.
 6. **Block wieder hinzufügen:** Startseite → Seite bearbeiten → Block hinzufügen „Fragenfilter“. Den Block des Kursfilters anschließend prüfen.
 7. **Prüfen:** Suche mit einer Frage; Cookie `kf_rater_id` im Browser (Secure, HttpOnly, SameSite=Lax); eine Bewertung abgeben. Beim Cron den ersten `generate_tags`-Lauf beobachten.
