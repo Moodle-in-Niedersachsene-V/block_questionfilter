@@ -41,7 +41,7 @@ Im Entwicklungsmodus (`$CFG->cachejs = false`) wird die Quelle aus `amd/src/` di
 
 ## Admin-Einstellungen
 
-**Website-Administration → Plugins → Blöcke → Fragebank-Filter**
+**Website-Administration → Plugins → Blöcke → Fragenfilter**
 
 | Einstellung | Beschreibung |
 |---|---|
