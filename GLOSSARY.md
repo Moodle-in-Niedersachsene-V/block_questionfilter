@@ -1,4 +1,4 @@
-# Fragebank-Filter
+# Fragenfilter
 
 Ein Block, mit dem man Fragen aus allen zugänglichen Fragensammlungen (System-, Kurs- und Modulkontext) findet, filtert und exportiert.
 

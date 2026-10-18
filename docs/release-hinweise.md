@@ -16,7 +16,7 @@
 
 ## Ablauf (Schritt für Schritt)
 
-1. **Sichern:** Datenbank-Backup. Einstellungen des alten Blocks notieren (Screenshot): Website-Administration → Plugins → Blöcke → Fragenfilter (bzw. Fragebank-Filter). Wichtig: KI-Backend, Claude-API-Key, Batchgröße, Auto-Apply, Rollen/Fächerlisten.
+1. **Sichern:** Datenbank-Backup. Einstellungen des alten Blocks notieren (Screenshot): Website-Administration → Plugins → Blöcke → Fragenfilter. Wichtig: KI-Backend, Claude-API-Key, Batchgröße, Auto-Apply, Rollen/Fächerlisten.
 2. **Alten Block von der Startseite entfernen** (Seite bearbeiten → Block löschen). Optional, es geht auch beim Deinstallieren.
 3. **Altes Plugin deinstallieren:** Website-Administration → Plugins → Plugin-Übersicht → `block_questionfilter` → Deinstallieren.
 4. **Neue Plugins hochladen:** Plugin installieren (File-Picker) mit `block_fragenfilter_2026101702.zip` und `block_kursfilter` (2026101501). Jeden Teilschritt mit „OK“ bestätigen. Das Upgrade legt die Vorschau-Rolle für die Pool-Konten an.

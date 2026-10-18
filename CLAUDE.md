@@ -1,4 +1,4 @@
-# Fragebank-Filter – CLAUDE.md
+# Fragenfilter – CLAUDE.md
 
 Moodle-Block `block_fragenfilter`: kursübergreifende Suche in Fragensammlungen, mit Filtern, Bewertung und Export (Moodle XML, CSV, GIFT). Details: [README.md](README.md).
 

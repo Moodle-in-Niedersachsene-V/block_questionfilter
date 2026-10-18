@@ -1,4 +1,4 @@
-# Fragebank-Filter
+# Fragenfilter
 
 Moodle-Block `block_fragenfilter`.
 
