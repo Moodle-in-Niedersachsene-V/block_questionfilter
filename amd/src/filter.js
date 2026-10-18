@@ -43,6 +43,8 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         this.panelOpen = false;
         this.panelQuery = '';
         this.debounce = null;
+        this.requestseq = 0; // Counts searches so late responses after a reset are ignored.
+        this.initialresults = ''; // Start-state markup of the result list, restored by reset.
         this.ratings = {}; // {qid: {average, count, myrating}}.
     }
 
@@ -59,6 +61,9 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
 
         // Load question types dynamically instead of hard-coding them.
         self.loadQuestionTypes();
+
+        var resultsEl = self.el('results');
+        self.initialresults = resultsEl ? resultsEl.innerHTML : '';
 
         // Difficulty chips.
         self.block().querySelectorAll('.qf-chip-diff').forEach(function(btn) {
@@ -176,6 +181,14 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
                 }
             }
         });
+
+        // Reset all filters and the result list to the start state.
+        var resetBtn = self.block().querySelector('.qf-reset');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function() {
+                self.reset();
+            });
+        }
 
         // Select all results.
         var selAllResults = self.block().querySelector('.qf-select-all');
@@ -605,6 +618,59 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
         });
     };
 
+    /**
+     * Clears search text, tags, collections, types, difficulty levels, selection
+     * and results, and drops any pending or running search.
+     */
+    BlockState.prototype.reset = function() {
+        var self = this;
+        clearTimeout(self.debounce);
+        self.requestseq++;
+        self.search = '';
+        self.cats = {};
+        self.types = {};
+        self.diffs = {};
+        self.tags = [];
+        self.selected = {};
+        self.results = [];
+        self.ratings = {};
+        self.panelQuery = '';
+
+        var searchEl = self.el('search');
+        if (searchEl) {
+            searchEl.value = '';
+        }
+        var hint = self.el('search-hint');
+        if (hint) {
+            hint.style.display = 'none';
+        }
+        var panelSearch = self.el('cat-search');
+        if (panelSearch) {
+            panelSearch.value = '';
+        }
+        self.block().querySelectorAll('.qf-chip-diff').forEach(function(btn) {
+            btn.classList.remove('qf-chip-active');
+        });
+        var spinner = self.el('spinner');
+        if (spinner) {
+            spinner.classList.add('d-none');
+        }
+        self.renderTagChips();
+        self.renderTypeChips();
+        self.renderPanelList();
+        self.updateCatInput();
+
+        var list = self.el('results');
+        if (list) {
+            list.innerHTML = self.initialresults;
+        }
+        var count = self.el('count');
+        if (count) {
+            count.textContent = '–';
+        }
+        self.updateFooter();
+    };
+
     // Search.
     BlockState.prototype.triggerSearch = function() {
         var self = this;
@@ -616,6 +682,7 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
 
     BlockState.prototype.runSearch = function() {
         var self = this;
+        var seq = ++self.requestseq;
         var spinner = self.el('spinner');
         if (spinner) {
             spinner.classList.remove('d-none');
@@ -634,6 +701,9 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
                 limit: 200,
             },
             done: function(result) {
+                if (seq !== self.requestseq) {
+                    return;
+                }
                 if (spinner) {
                     spinner.classList.add('d-none');
                 }
@@ -657,6 +727,9 @@ define(['core/ajax', 'core/notification'], function(Ajax, Notification) {
                 }
             },
             fail: function(err) {
+                if (seq !== self.requestseq) {
+                    return;
+                }
                 if (spinner) {
                     spinner.classList.add('d-none');
                 }

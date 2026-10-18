@@ -38,6 +38,7 @@ $string['block_fragenfilter:export'] = 'Fragen exportieren';
 $string['block_fragenfilter:myaddinstance'] = 'Block „Fragenfilter" zum Dashboard hinzufügen';
 $string['block_fragenfilter:reviewtags'] = 'KI-Tag-Vorschläge prüfen und freigeben';
 $string['block_fragenfilter:view'] = 'Fragenfilter-Block verwenden';
+$string['btn_reset'] = 'Zurücksetzen';
 $string['categories'] = 'Fragesammlungen';
 $string['col_actions'] = 'Aktionen';
 $string['col_question'] = 'Frage';
