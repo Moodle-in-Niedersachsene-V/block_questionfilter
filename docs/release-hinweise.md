@@ -24,3 +24,11 @@
 6. **Block wieder hinzufügen:** Startseite → Seite bearbeiten → Block hinzufügen „Fragenfilter“. Den Block des Kursfilters anschließend prüfen.
 7. **Prüfen:** Suche mit einer Frage; Cookie `kf_rater_id` im Browser (Secure, HttpOnly, SameSite=Lax); eine Bewertung abgeben. Beim Cron den ersten `generate_tags`-Lauf beobachten.
 8. **Weitere Tests:** HTTPS-/XSS-Test am 18.10.2026 auf Spike bestanden (siehe Fallplan PD-03, B4-03).
+
+## Admin-Upgrade bricht mit „Missing version.php file“ ab
+
+Moodle erkennt auch einen leeren Ordner `blocks/fragenfilter/` als Plugin. Auf moo war am 19.10.2026 ein solcher Restordner vorhanden, obwohl der Fragenfilter dort weder gemountet noch in der Datenbank installiert war. Auf der Spike war Build `2026101703` vollständig installiert.
+
+- **Plugin nicht vorgesehen:** Erst in der Plugin-Übersicht bzw. Datenbank prüfen, dass `block_fragenfilter` nicht installiert ist, und bei Docker ausschließen, dass der Ordner ein Mount-Ziel ist. Dann ausschließlich den leeren Ordner mit `rmdir` entfernen und Moodle-Caches leeren. `rmdir` verweigert das Löschen, sobald der Ordner Dateien enthält.
+- **Plugin vorgesehen oder bereits installiert:** Die vollständigen Release-Dateien bzw. den korrekten Bind-Mount unter `blocks/fragenfilter/` wiederherstellen. Keine einzelne `version.php` als Platzhalter anlegen.
+- **Separate PHP-Meldung:** `zend.exception_ignore_args = On` in der PHP-Konfiguration des Webservers aktivieren. Beim Moodle-Docker-Image ist das über die Compose-Umgebungsvariable `PHP_INI-zend.exception_ignore_args: "1"` möglich; anschließend den Webserver-Container neu erstellen und die Einstellung in Moodles Server-Überprüfung kontrollieren.
