@@ -22,7 +22,7 @@ direkt von der Startseite oder dem Dashboard aus.
 
 ## Installation
 
-1. Ordner `block_fragenfilter` nach `{moodle_root}/blocks/` kopieren
+1. Plugin-Dateien nach `{moodle_root}/blocks/fragenfilter/` kopieren. Direkt darin müssen `version.php` und `block_fragenfilter.php` liegen; ab Moodle 5.1 liegt `blocks/` unter `public/`.
 2. Als Admin unter **Website-Administration → Benachrichtigungen** das Upgrade ausführen
 3. Den Block auf der **Startseite** (oder einem Kurs) über *Block hinzufügen* einfügen
 
